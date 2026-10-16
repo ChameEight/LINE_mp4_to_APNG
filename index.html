@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mp4→APNG変換アプリ</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f0f2f6;
+            --text-color: #31333F;
+            --primary-color: #FF4B4B;
+            --secondary-bg: #ffffff;
+            --border-color: #e6e6e6;
+            --btn-hover: #ff3333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px 10px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--secondary-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h1, h2, h3 { color: var(--text-color); margin-top: 0; }
+        h1 { font-size: 1.8rem; margin-bottom: 5px; }
+        .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 20px; }
+        hr { border: 0; border-top: 1px solid var(--border-color); margin: 30px 0; }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #fafafa;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.dragover { background-color: #f0f7ff; border-color: #0073ea; }
+        .upload-area input[type="file"] { display: none; }
+        
+        .row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px; }
+        .col { flex: 1; min-width: 200px; }
+        
+        label { font-weight: 600; display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        select, input[type="text"] {
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;
+        }
+        
+        .control-group {
+            display: flex; align-items: center; gap: 10px; background: #f9f9f9; padding: 10px; border-radius: 8px;
+        }
+        .control-group button {
+            width: 36px; height: 36px; border: none; border-radius: 4px; background: #e0e0e0; cursor: pointer; font-size: 1rem; font-weight: bold;
+        }
+        .control-group button:hover { background: #d0d0d0; }
+        .control-group input[type="range"] { flex: 1; cursor: pointer; }
+        
+        .info-box { background: #e8f4f8; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; color: #00529b; margin-bottom: 15px; border-left: 4px solid #0073ea; }
+        .warning-box { background: #fff3cd; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; color: #856404; margin-bottom: 15px; border-left: 4px solid #ffeeba; }
+        .expert-box { background: #f4f1f8; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #8e44ad; }
+        
+        .timeline-container { width: 100%; overflow-x: auto; background: #000; display: flex; height: 80px; margin-bottom: 15px; border-radius: 4px;}
+        .timeline-container img { height: 100%; object-fit: cover; opacity: 0.8; }
+        
+        .cropper-wrapper { width: 100%; max-height: 500px; background: #ddd; margin-bottom: 15px; display: none; }
+        #cropperImage { display: block; max-width: 100%; }
+        
+        .preview-wrapper { text-align: center; margin-bottom: 15px; }
+        .preview-wrapper canvas { max-width: 100%; border: 1px solid #ccc; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/ENAEAA//8IE2EAAM8IE2EAAGQAAA//8IECoFAAAAAElFTkSuQmCC'); cursor: crosshair; }
+        .frame-editor { background:#f8f8f8; border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:15px; }
+        .frame-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+        .frame-toolbar button { border:1px solid #ccc; background:#fff; border-radius:5px; padding:7px 12px; cursor:pointer; font-weight:600; }
+        .frame-toolbar button:hover { background:#eee; }
+        .frame-toolbar button.danger { color:#b42318; }
+        .frame-toolbar button.playing { background:#ffe8e8; border-color:#ffaaaa; }
+        .frame-strip { display:flex; gap:8px; overflow-x:auto; padding:8px; background:#202020; border-radius:6px; min-height:96px; position: relative; }
+        .frame-item { position:relative; flex:0 0 76px; border:4px solid transparent; border-radius:5px; padding:3px; background:#fff; cursor:pointer; }
+        .frame-item.selected { border-color:var(--primary-color); box-shadow:0 0 0 4px rgba(255,75,75,.4); }
+        .frame-item img { width:70px; height:70px; object-fit:contain; display:block; background:#ddd; }
+        .frame-item .frame-no { position:absolute; left:4px; top:4px; background:rgba(0,0,0,.65); color:#fff; font-size:11px; padding:1px 4px; border-radius:3px; }
+        .frame-item .frame-source { position:absolute; right:4px; bottom:4px; background:rgba(0,0,0,.65); color:#fff; font-size:10px; padding:1px 3px; border-radius:3px; }
+        .anim-preview-box { background:#000; border-radius:8px; min-height:220px; display:flex; justify-content:center; align-items:center; margin-bottom:12px; padding:10px; }
+        .anim-preview-box canvas { 
+            max-width:100%; 
+            max-height:320px; 
+            image-rendering:auto; 
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/ENAEAA//8IE2EAAM8IE2EAAGQAAA//8IECoFAAAAAElFTkSuQmCC'); 
+            border: 2px solid #ffffff;
+            box-sizing: border-box;
+        }
+        .frame-count-info { font-size:.9rem; color:#555; margin-top:8px; }
+        
+        .crop-layout { display:flex; align-items:center; gap:12px; margin-bottom:15px; }
+        .crop-layout .cropper-wrapper { flex:1; min-width:0; margin-bottom:0; }
+        .crop-align-toolbar { display:flex; flex-direction:column; flex:0 0 auto; gap:8px; margin:0; }
+        .crop-align-toolbar button { border:1px solid #ccc; background:#fff; border-radius:5px; padding:7px 12px; cursor:pointer; font-weight:600; white-space:nowrap; }
+        .crop-align-toolbar button:hover { background:#eee; }
+        
+        /* --- ズーム用ツールバー --- */
+        .crop-zoom-toolbar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 0 0 auto;
+            gap: 8px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .crop-zoom-toolbar button {
+            width: 32px; height: 32px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; padding:0; display:flex; justify-content:center; align-items:center;
+        }
+        .crop-zoom-toolbar button:hover { background: #e0e0e0; }
+        .crop-zoom-toolbar input[type="range"] {
+            -webkit-appearance: slider-vertical;
+            appearance: slider-vertical;
+            writing-mode: bt-lr;
+            height: 120px;
+            width: 20px;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        @media (max-width: 600px) {
+            .crop-layout { align-items:stretch; flex-direction: column; }
+            .crop-align-toolbar { flex-direction:row; flex-wrap:wrap; justify-content: center; }
+            .crop-align-toolbar button { padding:6px 8px; font-size:.85rem; }
+            .crop-zoom-toolbar { flex-direction:row; justify-content:center; height: auto; }
+            .crop-zoom-toolbar input[type="range"] {
+                -webkit-appearance: none;
+                appearance: auto;
+                writing-mode: horizontal-tb;
+                width: 150px;
+                height: 20px;
+            }
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1.1rem; font-weight: bold; cursor: pointer; width: 100%; transition: background-color 0.2s;
+        }
+        .btn-primary:hover { background-color: var(--btn-hover); }
+        .btn-primary:disabled { background-color: #ffb3b3; cursor: not-allowed; }
+        
+        .checkbox-label { display: flex; align-items: center; font-weight: normal; font-size: 0.95rem; cursor: pointer; }
+        .checkbox-label input { margin-right: 8px; width: 18px; height: 18px; }
+
+        .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 15px 0; display: none; }
+        .progress-fill { height: 12px; background-color: var(--primary-color); width: 0%; transition: width 0.3s; }
+        
+        #resultArea { display: none; }
+        .preview-box { display: flex; justify-content: center; padding: 20px; transition: background-color 0.3s; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        .hidden { display: none !important; }
+        
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">画像を処理中...</div>
+
+<div class="container">
+    <h1>🎨 LINEスタンプ制作 Pro (Ultimate 20)</h1>
+    <p class="subtitle">動画から切り取る素材を決めたあと、トリミングした素材からAPNGの秒数とコマ数を設定できます。コマは削除・複製でき、プレビューを見ながら調整できます。</p>
+
+    <div class="upload-area" id="uploadArea">
+        <span style="font-size: 2rem;">📁</span><br>
+        <strong>動画をアップロード</strong><br>
+        <span style="font-size: 0.8rem; color: #666;">ファイルをここにドラッグ＆ドロップ、またはクリックして選択</span>
+        <input type="file" id="videoUpload" accept="video/mp4,video/quicktime,video/x-msvideo">
+    </div>
+
+    <video id="hiddenVideo" class="hidden" playsinline muted></video>
+
+    <div id="mainUI" class="hidden">
+        <hr>
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+            <h2 style="margin: 0;">1. 動画から切り取る素材の設定</h2>
+            <button id="btnSetFullDuration" style="padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-weight: bold; font-size: 0.9rem;">⏱ 全秒数を指定する</button>
+        </div>
+
+        <div class="row" style="margin-top: 15px;">
+            <div class="col">
+                <label>切り取り始まり (秒) <span id="startValDisp">0.0</span></label>
+                <div class="control-group">
+                    <button id="btnStartDec">－</button>
+                    <input type="range" id="startSlider" min="0" max="0" step="0.1" value="0">
+                    <button id="btnStartInc">＋</button>
+                </div>
+            </div>
+            <div class="col">
+                <label>切り取り終わり (秒) <span id="endValDisp">4.0</span></label>
+                <div class="control-group">
+                    <button id="btnEndDec">－</button>
+                    <input type="range" id="endSlider" min="0" max="0" step="0.1" value="4.0">
+                    <button id="btnEndInc">＋</button>
+                </div>
+            </div>
+            <div class="col">
+                <label>切り取るコマ数 <span id="sourceFrameCountValDisp">15</span></label>
+                <div class="control-group">
+                    <button id="btnSourceFrameCountDec">－</button>
+                    <input type="range" id="sourceFrameCountSlider" min="5" max="20" step="1" value="15">
+                    <button id="btnSourceFrameCountInc">＋</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box" id="statusText">現在の設定: 0.0秒 ～ 4.0秒 (20コマ) ／ APNG設定は下で調整できます</div>
+
+        <label>🎬 選択された範囲のタイムライン</label>
+        <div class="timeline-container" id="timelineContainer"></div>
+
+        <hr>
+        <h2>2. 種類と構図の調整</h2>
+        <div style="margin-bottom: 15px;">
+            <label>作成する種類を選択してください</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
+		<label class="checkbox-label"><input type="radio" name="outputType" value="anim320" checked> アニメーションスタンプ (320 × 270)</label> 
+                <label class="checkbox-label"><input type="radio" name="outputType" value="pop320"> ポップアップ・エフェクトスタンプ (480 × 480)</label>                               
+                <label class="checkbox-label"><input type="radio" name="outputType" value="emoji180"> アニメーション絵文字 (180 × 180)</label>                
+                <label class="checkbox-label"><input type="radio" name="outputType" value="custom"> 🛠 自由なサイズ（カスタム）</label>
+                <div id="customSizeInputs" class="hidden" style="margin-left: 25px; display: flex; gap: 15px; align-items: center;">
+                    <label style="margin: 0;">幅 (W): <input type="number" id="customWidth" value="300" style="width: 80px; padding: 4px;"></label>
+                    <label style="margin: 0;">高さ (H): <input type="number" id="customHeight" value="300" style="width: 80px; padding: 4px;"></label>
+                </div>
+            </div>
+        </div>
+        <div class="crop-layout">
+            <div class="cropper-wrapper" id="cropperWrapper">
+                <img id="cropperImage" src="" alt="Crop Source">
+            </div>
+            <div class="crop-align-toolbar">
+                <button id="btnCropCenterBoth">✛ 上下左右中央に配置</button>
+                <button id="btnCropCenterHorizontal">↔ 左右中央に配置</button>
+                <button id="btnCropCenterVertical">↕ 上下中央に配置</button>
+            </div>
+            
+            <div class="crop-zoom-toolbar">
+                <button id="btnZoomIn" title="拡大（アップ）">＋</button>
+                <input type="range" id="cropZoomSlider" min="0.2" max="2.0" step="0.05" value="1.0" orient="vertical">
+                <button id="btnZoomOut" title="縮小（引き）">－</button>
+            </div>
+        </div>
+
+        <hr>
+        <h2>3. APNGの秒数とコマ数を調整</h2>
+        <div class="frame-editor">
+            <div class="row">
+                <div class="col">
+                    <label>APNGの再生時間</label>
+                    <select id="apngDurationSelect">
+                        <option value="1">1秒</option>
+                        <option value="1.5">1.5秒</option>
+                        <option value="2">2秒</option>
+                        <option value="3" selected>3秒</option>
+                        <option value="4">4秒</option>
+                    </select>
+                </div>
+                
+                <div class="col">
+                    <label>ループ回数</label>
+                    <select id="apngLoopSelect">
+                        <option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="info-box" id="apngStatusText">APNG設定: 3秒・10コマ ／ 1コマ約100ms</div>
+            <div class="warning-box hidden" id="durationWarning">⚠️ 4秒を超えています。LINEの公式規定外となるため、登録時に弾かれるか、ループ再生されない可能性があります。</div>
+
+            <div class="anim-preview-box">
+                <canvas id="editorAnimCanvas" width="320" height="270"></canvas>
+            </div>
+            <div class="frame-toolbar">
+                <button id="btnPlayPause">▶ 再生</button>
+                <button id="btnPrevFrame">← 前のコマ</button>
+                <button id="btnNextFrame">次のコマ →</button>
+                <button id="btnDuplicateFrame">📄 選択コマを複製</button>
+                <button id="btnDeleteFrame" class="danger">🗑 選択コマを削除</button>
+                <button id="btnMoveToFirstFrame" style="color:#0073ea;">🔝 選択コマを先頭に複製</button>
+                <button id="btnResetFrames" style="color:#28a745;">🔄 コマを初期状態に戻す</button>
+            </div>
+            <div class="frame-strip" id="frameStrip"></div>
+            <div class="frame-count-info" id="frameCountInfo"></div>
+            <div style="font-size:.85rem;color:#666;margin-top:6px;">※ APNGはFPSではなく「再生時間」と「コマ数」で決まります。手動で削除・複製したコマもそのまま書き出しに反映されます。</div>
+        </div>
+
+        <hr>
+        <h2>4. 書き出しと背景透過・装飾設定</h2>
+        
+        <label>背景透過の方法を選択</label>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px; margin-bottom: 20px;">
+            <label class="checkbox-label"><input type="radio" name="bgRemovalMethod" value="none" checked> 🚫 透過しない</label>
+            <label class="checkbox-label"><input type="radio" name="bgRemovalMethod" value="chromakey"> 🟩 透過する</label>
+        </div>
+
+        <div id="chromakeySettings" class="expert-box hidden">
+            <h4 style="margin-top:0; color:#8e44ad; margin-bottom:10px;">クロマキー透過 ＆ デスピル（色フチ除去）設定</h4>
+            <div class="row">
+                <div class="col">
+                    <label>キーカラー（抜きたい色）</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:5px;">
+                        <input type="color" id="chromaKeyColor" value="#529ADB" style="width:50px; height:36px; padding:0; border:1px solid #ccc; cursor:pointer; flex-shrink:0;">
+                        <button id="btnAutoDetectColor" style="padding: 7px 12px; border:1px solid #ccc; border-radius:5px; background:#fff; cursor:pointer; font-size:0.9rem; white-space:nowrap;">✨ 自動検出</button>
+                        <button id="btnPickChromaColor" style="padding: 7px 12px; border:1px solid #ccc; border-radius:5px; background:#fff; cursor:pointer; font-size:0.9rem; white-space:nowrap;">プレビューから色をスポイト</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <label>クロマキー許容値 (%) <span id="chromaTolValDisp">10</span></label>
+                    <div class="control-group">
+                        <button id="btnChromaTolDec">－</button>
+                        <input type="range" id="chromaTolSlider" min="0" max="100" step="1" value="10">
+                        <button id="btnChromaTolInc">＋</button>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:0.85rem; color:#666; margin-bottom:15px; margin-top:5px;">※背景を消すための基本設定です。上げすぎるとキャラクターまで透明化されます。</div>
+            
+            <hr style="border-top:1px dashed #ccc; margin: 15px 0;">
+            
+            <div class="row">
+                <div class="col">
+                    <label>フチ削り (px) <span id="shrinkTolValDisp">0</span></label>
+                    <div class="control-group">
+                        <button id="btnShrinkTolDec">－</button>
+                        <input type="range" id="shrinkTolSlider" min="0" max="10" step="0.5" value="0">
+                        <button id="btnShrinkTolInc">＋</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <label>色フチ除去強度 (%) <span id="despillValDisp">70</span></label>
+                    <div class="control-group">
+                        <button id="btnDespillDec">－</button>
+                        <input type="range" id="despillSlider" min="0" max="100" step="1" value="70">
+                        <button id="btnDespillInc">＋</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <label>色フチ除去範囲 (px) <span id="despillRangeValDisp">2</span></label>
+                    <div class="control-group">
+                        <button id="btnDespillRangeDec">－</button>
+                        <input type="range" id="despillRangeSlider" min="1" max="10" step="1" value="2">
+                        <button id="btnDespillRangeInc">＋</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <label>元の明度・彩度を復元 (%) <span id="colorRestoreValDisp">70</span></label>
+                    <div class="control-group">
+                        <button id="btnColorRestoreDec">－</button>
+                        <input type="range" id="colorRestoreSlider" min="0" max="100" step="1" value="70">
+                        <button id="btnColorRestoreInc">＋</button>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:0.85rem; color:#666; margin-top:5px;">※エッジに残った不要な色（緑・青など）を中和・除去し、元の色味を取り戻します。</div>
+        </div>
+
+       
+<div id="commonPreviewWrapper" style="margin-top: 15px; margin-bottom: 20px;">
+    <div class="preview-wrapper" id="previewAreaWrapper">
+        <label>👇 プレビュー画像 <span id="previewInstruction" style="color:var(--primary-color); font-weight:bold;"></span></label><br>                
+        
+        <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 10px; margin-bottom: 10px; background: #f8f8f8; padding: 10px; border-radius: 8px; border: 1px solid #e6e6e6;">
+            <button id="btnPreviewPrev" style="padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-weight: bold;">◀ 前のフレームへ</button>
+            <div style="font-weight: bold; font-size: 1.1rem; color: #333;">
+                現在 <span id="currentFrameNum" style="color: #FF4B4B; font-size: 1.3rem;">1</span> / <span id="totalFrameNum">15</span> 枚目
+            </div>
+            <button id="btnPreviewNext" style="padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-weight: bold;">次のフレームへ ▶</button>
+        </div>               
+
+        
+        <div id="previewCanvasContainer" style="overflow: auto; height: 300px; border: 1px solid #ccc; background: #e0e0e0; border-radius: 4px; padding: 10px;">      <canvas id="previewCanvas" style="margin: 0 auto; display: block; max-width: none; background: #ffffff;"></canvas>
+</div>
+    </div>
+</div>
+
+        <div id="eraserToolbar" style="margin-top: 10px; margin-bottom: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 6px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                <button id="btnToggleEraser" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-weight: bold;">
+                    ✏️ 手描き編集: OFF
+                </button>
+                
+                <!-- Undo / Redo ボタンを追加 -->
+                <div style="display: flex; align-items: center; gap: 5px; border-right: 1px dashed #ccc; padding-right: 15px;">
+                    <button type="button" id="btnUndoEraser" disabled style="padding: 6px 10px; border:1px solid #ccc; border-radius:4px; background:#f0f0f0; cursor:not-allowed; font-weight:bold;" title="戻る (Ctrl+Z)">↩️ 戻る</button>
+                    <button type="button" id="btnRedoEraser" disabled style="padding: 6px 10px; border:1px solid #ccc; border-radius:4px; background:#f0f0f0; cursor:not-allowed; font-weight:bold;" title="進む (Ctrl+Y)">↪️ 進む</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px; border-right: 1px dashed #ccc; padding-right: 15px;">
+                    <label class="checkbox-label" style="margin:0;"><input type="radio" name="drawTool" value="eraser" checked disabled> 🧽 消しゴム</label>
+                    <label class="checkbox-label" style="margin:0;"><input type="radio" name="drawTool" value="fill" disabled> 🖌️ 塗りつぶし</label>
+                    
+                    <input type="color" id="fillColorPicker" value="#ffffff" style="width:36px; height:36px; padding:0; border:1px solid #ccc; cursor:pointer;" disabled>
+                    <button type="button" id="btnPickFillColor" style="padding: 6px 10px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:0.85rem;" disabled>スポイト</button>
+                </div>
+
+                <label style="display: flex; align-items: center; gap: 5px; margin: 0; font-weight: 600; font-size: 0.9rem;">
+                    🎬 編集フレーム:
+                    <select id="eraserFrameSelect" style="padding: 5px 8px; border-radius: 4px; border: 1px solid #ccc; width: auto; font-size: 0.95rem;">
+                    </select>
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; margin: 0; font-weight: 600; font-size: 0.9rem;">
+                    サイズ: <span id="eraserSizeDisp">15</span>px
+                    <button type="button" id="btnEraserSizeDec" style="width: 28px; height: 28px; border: 1px solid #ccc; border-radius: 4px; background: #eee; cursor: pointer; font-weight: bold; padding: 0; display: flex; justify-content: center; align-items: center;">－</button>
+                    <input type="range" id="eraserSize" min="1" max="50" value="15" style="vertical-align: middle;">
+                    <button type="button" id="btnEraserSizeInc" style="width: 28px; height: 28px; border: 1px solid #ccc; border-radius: 4px; background: #eee; cursor: pointer; font-weight: bold; padding: 0; display: flex; justify-content: center; align-items: center;">＋</button>
+                </label>
+                               
+                <label style="display: flex; align-items: center; gap: 5px; margin: 0; font-weight: 600; font-size: 0.9rem; border-left: 1px dashed #ccc; padding-left: 15px;">
+                    🔍 表示ズーム: <span id="previewZoomDisp">100</span>%
+                    <input type="range" id="previewZoomSlider" min="50" max="500" value="100" step="10" style="vertical-align: middle;">
+                </label>                
+
+            </div>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 0.9rem; align-items: center; border-top: 1px dashed #ccc; padding-top: 10px;">
+                <label style="margin:0; font-weight:600;">プレビュー背景:</label>
+                
+                <label class="checkbox-label"><input type="radio" name="eraserBgChoice" value="white" checked> 白</label>
+                <label class="checkbox-label"><input type="radio" name="eraserBgChoice" value="black"> 黒 (ダーク)</label>
+                <label class="checkbox-label"><input type="radio" name="eraserBgChoice" value="blue"> LINE風</label>
+                <label class="checkbox-label"><input type="radio" name="eraserBgChoice" value="default"> 格子柄</label>
+            </div>
+        </div>
+
+        <label class="checkbox-label" style="margin-bottom: 10px;">
+            <input type="checkbox" id="useBorder"> ⚪ キャラクターに白い縁取り（フチ）をつける
+        </label>
+        <div id="borderSettings" class="hidden" style="margin-left: 25px; margin-bottom: 20px; width: 50%;">
+            <label>白フチの太さ (px) <span id="borderValDisp">2</span></label>
+            <div class="control-group">
+                <button id="btnBorderDec">－</button>
+                <input type="range" id="borderSlider" min="0" max="20" step="1" value="2">
+                <button id="btnBorderInc">＋</button>
+            </div>
+        </div>
+
+        <label class="checkbox-label" style="margin-bottom: 10px;">
+            <input type="checkbox" id="useCompression" checked> 🗜️ APNG書き出し時に容量を自動圧縮する（減色処理）
+        </label>
+        
+        <label class="checkbox-label" style="margin-bottom: 25px;">
+            <input type="checkbox" id="useReverse"> ⏪ 逆再生でアニメを作成する
+        </label>
+
+        <button id="btnExport" class="btn-primary">🚀 動画を書き出す</button>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div id="progressText" style="text-align: center; font-size: 0.9rem; margin-top: 5px; color: #666;"></div>
+    </div>
+
+    <div id="resultArea">
+        <hr>
+        <h2>🎉 処理完了！</h2>
+        <div id="resultStatus"></div>
+        
+        <label>👇 書き出し後プレビュー</label>
+
+        <div style="margin: 10px 0; font-size: 0.95rem; background: #f8f8f8; padding: 10px; border-radius: 6px; border: 1px solid #e6e6e6;">
+            <span style="font-weight: 600; margin-right: 15px;">再生終了時の表示:</span>
+            <label class="checkbox-label" style="display: inline-flex; margin-right: 15px;">
+                <input type="radio" name="previewEndAction" value="first" checked> 1コマ目に戻る
+            </label>
+            <label class="checkbox-label" style="display: inline-flex;">
+                <input type="radio" name="previewEndAction" value="last"> 最後のコマを表示し続ける
+            </label>
+        </div>
+
+        <div style="margin: 10px 0; display: flex; gap: 15px; font-size: 0.9rem; align-items: center; flex-wrap: wrap;">
+            <label class="checkbox-label"><input type="radio" name="bgChoice" value="white" checked> デフォルト</label>
+            <label class="checkbox-label"><input type="radio" name="bgChoice" value="black"> 黒 (ダーク)</label>
+            <label class="checkbox-label"><input type="radio" name="bgChoice" value="gray"> グレー</label>
+            <label class="checkbox-label"><input type="radio" name="bgChoice" value="blue"> LINE風</label>
+            <button id="btnReplayPreview" class="btn-primary" style="padding: 6px 16px; font-size: 0.9rem; width: auto; margin-left: auto;">▶ プレビューを再生</button>
+        </div>
+        
+        <div class="preview-box" id="finalPreviewBox">
+            <img id="finalPreviewImg" src="">
+        </div>
+
+        <hr>
+        <h2>💾 ファイルの保存</h2>
+        <label>保存するファイル名</label>
+        <input type="text" id="filenameInput" value="01" style="margin-bottom: 15px;">
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+            <button id="btnDownloadApngOnly" class="btn-primary" style="background-color: #16c784; flex: 1; min-width: 150px;">📥 APNGのみDL</button>
+            <button id="btnDownloadPngOnly" class="btn-primary" style="background-color: #16c784; flex: 1; min-width: 150px;">📥 PNGのみDL</button>
+            <button id="btnDownloadBoth" class="btn-primary" style="background-color: #16c784; flex: 1; min-width: 150px;">📥 APNG+PNGをDL</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// --- グローバル状態・タイマー管理 ---
+let cropUpdateTimer = null; // ズームおよびキーボード微調整時のプレビュー更新用
+
+const state = {
+    videoFile: null,
+    videoDuration: 0,
+    startTime: 0.0,
+    endTime: 4.0,
+    sourceFrameCount: 15, 
+    apngDuration: 3, 
+    apngFrameCount: 15,
+    apngLoopCount: 1,
+    outputFrames: [], 
+    cachedFrames: [], 
+    selectedOutputFrame: 0,    
+    previewTimer: null,
+    previewToken: 0,
+    renderToken: 0, 
+    previewPlaying: true,    
+    targetW: 320,
+    targetH: 270,
+    maxSizeKb: 1000,
+    outputTypeStr: "アニメーションスタンプ",
+    
+    // 背景透過設定
+    bgRemovalMethod: 'none',
+    chromaKeyColor: {r: 82, g: 154, b: 219},
+    chromaTolerance: 10,
+    edgeShrink: 0,       // 拡張クロマキー: フチ削り
+    despillAmount: 70,   // 拡張クロマキー: 色フチ除去強度
+    despillRange: 2,     // 拡張クロマキー: 色フチ除去範囲
+    colorRestore: 70,    // 拡張クロマキー: 明度・彩度復元
+    isPickingColor: false,
+    
+    borderSize: 2,
+    previewFrameIdx: 1,
+    
+    cropper: null,
+    cropData: { left: 0, top: 0, width: 100, height: 100 },
+    
+    processedData: null,
+    currentPreviewUrl: null,
+    previewReplayTimer: null
+};
+
+// --- DOM要素取得 ---
+const el = {
+    uploadArea: document.getElementById('uploadArea'),
+    videoUpload: document.getElementById('videoUpload'),
+    hiddenVideo: document.getElementById('hiddenVideo'),
+    mainUI: document.getElementById('mainUI'),
+    btnSetFullDuration: document.getElementById('btnSetFullDuration'),
+    startSlider: document.getElementById('startSlider'),
+    endSlider: document.getElementById('endSlider'),
+    sourceFrameCountValDisp: document.getElementById('sourceFrameCountValDisp'),
+    sourceFrameCountSlider: document.getElementById('sourceFrameCountSlider'),
+    timelineContainer: document.getElementById('timelineContainer'),
+    apngDurationSelect: document.getElementById('apngDurationSelect'),
+    apngLoopSelect: document.getElementById('apngLoopSelect'),
+    apngStatusText: document.getElementById('apngStatusText'),
+    btnPlayPause: document.getElementById('btnPlayPause'),   
+    editorAnimCanvas: document.getElementById('editorAnimCanvas'),
+    frameStrip: document.getElementById('frameStrip'),
+    frameCountInfo: document.getElementById('frameCountInfo'),
+    btnPrevFrame: document.getElementById('btnPrevFrame'),
+    btnNextFrame: document.getElementById('btnNextFrame'),
+    btnDuplicateFrame: document.getElementById('btnDuplicateFrame'),
+    btnDeleteFrame: document.getElementById('btnDeleteFrame'),
+    btnMoveToFirstFrame: document.getElementById('btnMoveToFirstFrame'),
+    btnResetFrames: document.getElementById('btnResetFrames'),
+    cropperWrapper: document.getElementById('cropperWrapper'),
+    cropperImage: document.getElementById('cropperImage'),
+    btnCropCenterBoth: document.getElementById('btnCropCenterBoth'),
+    btnCropCenterHorizontal: document.getElementById('btnCropCenterHorizontal'),
+    btnCropCenterVertical: document.getElementById('btnCropCenterVertical'),
+    
+    btnZoomIn: document.getElementById('btnZoomIn'),
+    btnZoomOut: document.getElementById('btnZoomOut'),
+    cropZoomSlider: document.getElementById('cropZoomSlider'),
+    
+    previewCanvas: document.getElementById('previewCanvas'),
+    previewAreaWrapper: document.getElementById('previewAreaWrapper'),    
+    
+    btnPreviewPrev: document.getElementById('btnPreviewPrev'),
+    btnPreviewNext: document.getElementById('btnPreviewNext'),
+    currentFrameNum: document.getElementById('currentFrameNum'),
+    totalFrameNum: document.getElementById('totalFrameNum'),   
+
+    previewZoomSlider: document.getElementById('previewZoomSlider'),
+    previewZoomDisp: document.getElementById('previewZoomDisp'),
+    
+    fillColorPicker: document.getElementById('fillColorPicker'),
+    btnPickFillColor: document.getElementById('btnPickFillColor'),
+    
+    chromakeySettings: document.getElementById('chromakeySettings'),
+    
+    chromaKeyColor: document.getElementById('chromaKeyColor'),
+    chromaTolSlider: document.getElementById('chromaTolSlider'),
+    shrinkTolSlider: document.getElementById('shrinkTolSlider'),
+    despillSlider: document.getElementById('despillSlider'),
+    despillRangeSlider: document.getElementById('despillRangeSlider'),
+    colorRestoreSlider: document.getElementById('colorRestoreSlider'),
+    btnPickChromaColor: document.getElementById('btnPickChromaColor'),
+    btnAutoDetectColor: document.getElementById('btnAutoDetectColor'),
+    
+    useBorder: document.getElementById('useBorder'),
+    useReverse: document.getElementById('useReverse'), // 逆再生チェックボックス
+    borderSettings: document.getElementById('borderSettings'),
+    borderSlider: document.getElementById('borderSlider'),
+    btnExport: document.getElementById('btnExport'),
+    progressBar: document.getElementById('progressBar'),
+    progressFill: document.getElementById('progressFill'),
+    progressText: document.getElementById('progressText'),
+    resultArea: document.getElementById('resultArea'),
+    resultStatus: document.getElementById('resultStatus'),
+    finalPreviewBox: document.getElementById('finalPreviewBox'),
+    finalPreviewImg: document.getElementById('finalPreviewImg'),
+    btnReplayPreview: document.getElementById('btnReplayPreview'),
+    filenameInput: document.getElementById('filenameInput'),
+    btnDownloadApngOnly: document.getElementById('btnDownloadApngOnly'),
+    btnDownloadPngOnly: document.getElementById('btnDownloadPngOnly'),
+    btnDownloadBoth: document.getElementById('btnDownloadBoth'),
+    loadingOverlay: document.getElementById('loadingOverlay')
+};
+
+// --- 消しゴム/塗りつぶし用の状態管理と操作 ---
+const eraserState = {
+    isActive: false,
+    tool: 'eraser',
+    isDrawing: false,
+    size: 15,
+    history: [], // Undo用の履歴スタック
+    redoHistory: [], // Redo用の履歴スタック
+    fillColor: '#ffffff',
+    isPickingColor: false
+};
+
+const btnToggleEraser = document.getElementById('btnToggleEraser');
+const eraserSizeSlider = document.getElementById('eraserSize');
+const eraserSizeDisp = document.getElementById('eraserSizeDisp');
+const eraserFrameSelect = document.getElementById('eraserFrameSelect');
+const btnUndoEraser = document.getElementById('btnUndoEraser');
+const btnRedoEraser = document.getElementById('btnRedoEraser');
+
+// ツール選択の切り替え
+document.getElementsByName('drawTool').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        eraserState.tool = e.target.value;
+        const isFill = eraserState.tool === 'fill';
+        if (el.fillColorPicker) el.fillColorPicker.disabled = !isFill;
+        if (el.btnPickFillColor) el.btnPickFillColor.disabled = !isFill;
+        updateEraserCursor();
+    });
+});
+
+if (el.fillColorPicker) {
+    el.fillColorPicker.addEventListener('input', (e) => {
+        eraserState.fillColor = e.target.value;
+        updateEraserCursor();
+    });
+}
+
+if (el.btnPickFillColor) {
+    el.btnPickFillColor.addEventListener('click', () => {
+        eraserState.isPickingColor = !eraserState.isPickingColor;
+        if (eraserState.isPickingColor) {
+            el.btnPickFillColor.style.background = "#ffb3b3";
+            el.btnPickFillColor.innerText = "キャンセル (クリックで取得)";
+            
+            // 手描き用スポイトをONにした時、クロマキー用スポイトを強制OFFにする
+            if (state.isPickingColor) {
+                state.isPickingColor = false;
+                el.btnPickChromaColor.style.background = "";
+                el.btnPickChromaColor.innerText = "プレビューから色をスポイト";
+                document.getElementById('previewInstruction').innerText = "";
+            }
+        } else {
+            el.btnPickFillColor.style.background = "#fff";
+            el.btnPickFillColor.innerText = "スポイト";
+        }
+        updateEraserCursor();
+    });
+}
+// 消しゴム/塗りつぶしのカスタムカーソルを更新する関数
+function updateEraserCursor() {
+    if (!eraserState.isActive) {
+        el.previewCanvas.style.cursor = "default";
+        return;
+    }
+    if (eraserState.isPickingColor) {
+        el.previewCanvas.style.cursor = "crosshair";
+        return;
+    }
+    const rect = el.previewCanvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    
+    const logicalWidth = el.previewCanvas.width || state.targetW;
+    const scale = rect.width / logicalWidth;
+    
+    // カーソルの表示上の直径を計算
+    let visualDiameter = Math.max(2, Math.round(eraserState.size * 2 * scale));
+    const maxCursorSize = 128; // ブラウザによるカスタムカーソルサイズ上限対策
+    if(visualDiameter > maxCursorSize) visualDiameter = maxCursorSize;
+
+    const half = visualDiameter / 2;
+    
+    let fillStyle = "rgba(255,255,255,0.2)";
+    if (eraserState.tool === 'fill') {
+        let rgb = hexToRgb(eraserState.fillColor);
+        fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+    }
+    
+    // 円を描画したSVGをBase64にエンコードしてカーソルにする
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${visualDiameter}" height="${visualDiameter}" viewBox="0 0 ${visualDiameter} ${visualDiameter}"><circle cx="${half}" cy="${half}" r="${Math.max(0, half - 0.5)}" fill="${fillStyle}" stroke="black" stroke-width="1" /><circle cx="${half}" cy="${half}" r="${Math.max(0, half - 1.5)}" fill="none" stroke="white" stroke-width="1" /></svg>`;
+    
+    const cursorUrl = `url('data:image/svg+xml;base64,${btoa(svg)}') ${half} ${half}, crosshair`;
+    el.previewCanvas.style.cursor = cursorUrl;
+}
+
+// リサイズ時にもカーソルサイズを補正
+window.addEventListener('resize', updateEraserCursor);
+
+// 消しゴム用フレーム選択プルダウンのオプションを更新
+function updateEraserFrameSelectOptions() {
+    if (!eraserFrameSelect) return;
+    eraserFrameSelect.innerHTML = '';
+    
+    state.outputFrames.forEach((offsetSec, idx) => {
+        const option = document.createElement('option');
+        option.value = idx;
+        const originalSec = (state.startTime + offsetSec).toFixed(2);
+        option.textContent = `コマ ${idx + 1} (${originalSec}s)`;
+        if (idx === state.selectedOutputFrame) {
+            option.selected = true;
+        }
+        eraserFrameSelect.appendChild(option);
+    });
+}
+
+// 消しゴム編集対象フレームの切り替え
+async function switchEraserFrame(index) {
+    if (index < 0 || index >= state.outputFrames.length) return;
+
+    // 消しゴム用の独立したフレーム番号を保存
+    state.eraserFrameIdx = index;
+
+    // プルダウンは表示だけ同期
+    if (eraserFrameSelect) {
+        eraserFrameSelect.value = index;
+    }
+
+    // キャッシュが無ければ生成
+    if (!state.cachedFrames[index]) {
+        const offsetSec = state.outputFrames[index] ?? 0;
+        state.cachedFrames[index] = await getProcessedCanvasForOutputOffset(offsetSec);
+    }
+
+    const activeCanvas = state.cachedFrames[index];
+
+    if (activeCanvas) {
+        // section 4 のプレビューキャンバスを更新
+        el.previewCanvas.width = state.targetW;
+        el.previewCanvas.height = state.targetH;
+
+        const ctxPreview = el.previewCanvas.getContext('2d');
+        ctxPreview.clearRect(0, 0, state.targetW, state.targetH);
+        ctxPreview.drawImage(activeCanvas, 0, 0);
+        applyPreviewZoom();
+    }
+
+    // 選択状態・番号を更新 (消しゴムナビ用)
+    updatePreviewFrameNav();
+
+    // 消しゴムカーソルも更新
+    updateEraserCursor();
+}
+
+// プルダウン変更イベント
+if (eraserFrameSelect) {
+    eraserFrameSelect.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.value, 10);
+        switchEraserFrame(idx);
+    });
+}
+
+// 手描きモードの切り替え
+btnToggleEraser.addEventListener('click', async () => {
+    eraserState.isActive = !eraserState.isActive;
+    const drawToolRadios = document.getElementsByName('drawTool');
+    
+    if (eraserState.isActive) {
+        btnToggleEraser.style.background = "#ffe8e8";
+        btnToggleEraser.style.borderColor = "#ffaaaa";
+        btnToggleEraser.innerText = "✏️ 手描き編集: ON";
+        
+        drawToolRadios.forEach(r => r.disabled = false);
+        const isFill = eraserState.tool === 'fill';
+        if (el.fillColorPicker) el.fillColorPicker.disabled = !isFill;
+        if (el.btnPickFillColor) el.btnPickFillColor.disabled = !isFill;
+        
+        updateEraserCursor();
+        await switchEraserFrame(state.eraserFrameIdx || 0); // ここを変更
+    } else {
+        btnToggleEraser.style.background = "#fff";
+        btnToggleEraser.style.borderColor = "#ccc";
+        btnToggleEraser.innerText = "✏️ 手描き編集: OFF";
+        el.previewCanvas.style.cursor = "default";
+        
+        drawToolRadios.forEach(r => r.disabled = true);
+        if (el.fillColorPicker) el.fillColorPicker.disabled = true;
+        if (el.btnPickFillColor) el.btnPickFillColor.disabled = true;
+        
+        if (eraserState.isPickingColor) {
+            eraserState.isPickingColor = false;
+            el.btnPickFillColor.style.background = "#fff";
+            el.btnPickFillColor.innerText = "スポイト";
+        }
+    }
+});
+
+// キャンバス上のマウス座標を取得
+function getCanvasPos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
+}
+
+// 消去または塗りつぶし処理
+function eraseAt(x, y) {
+    let idx = state.eraserFrameIdx || 0;
+    if (!state.cachedFrames[idx]) return;
+    
+    // 1. 実データのキャンバス（キャッシュ）を削る/塗る
+    const activeCanvas = state.cachedFrames[idx];
+    const ctxActive = activeCanvas.getContext('2d');
+    
+    if (eraserState.tool === 'eraser') {
+        ctxActive.globalCompositeOperation = 'destination-out';
+    } else {
+        ctxActive.globalCompositeOperation = 'source-over';
+        ctxActive.fillStyle = eraserState.fillColor;
+    }
+    ctxActive.beginPath();
+    ctxActive.arc(x, y, eraserState.size, 0, Math.PI * 2);
+    ctxActive.fill();
+    ctxActive.globalCompositeOperation = 'source-over';
+
+    // 2. プレビュー用キャンバスを削る/塗る
+    const ctxPreview = el.previewCanvas.getContext('2d');
+    if (eraserState.tool === 'eraser') {
+        ctxPreview.globalCompositeOperation = 'destination-out';
+    } else {
+        ctxPreview.globalCompositeOperation = 'source-over';
+        ctxPreview.fillStyle = eraserState.fillColor;
+    }
+    ctxPreview.beginPath();
+    ctxPreview.arc(x, y, eraserState.size, 0, Math.PI * 2);
+    ctxPreview.fill();
+    ctxPreview.globalCompositeOperation = 'source-over';
+
+    // 3. アニメーションプレビューにも反映（再生停止中で同じコマの場合のみ）
+    if (!state.previewPlaying && state.selectedOutputFrame === idx) {
+        showEditorFrame(idx, false);
+    }
+}
+
+// サムネイル画像の更新
+function updateFrameThumbnail(index) {
+    const items = el.frameStrip.querySelectorAll('.frame-item');
+    if (items[index] && state.cachedFrames[index]) {
+        const img = items[index].querySelector('img');
+        if (img) {
+            img.src = state.cachedFrames[index].toDataURL('image/jpeg', 0.65);
+        }
+    }
+}
+
+// --- Undo / Redo 機能 ---
+function updateUndoRedoButtons() {
+    if (btnUndoEraser) {
+        const canUndo = eraserState.history.length > 0;
+        btnUndoEraser.disabled = !canUndo;
+        btnUndoEraser.style.background = canUndo ? "#fff" : "#f0f0f0";
+        btnUndoEraser.style.cursor = canUndo ? "pointer" : "not-allowed";
+    }
+    if (btnRedoEraser) {
+        const canRedo = eraserState.redoHistory.length > 0;
+        btnRedoEraser.disabled = !canRedo;
+        btnRedoEraser.style.background = canRedo ? "#fff" : "#f0f0f0";
+        btnRedoEraser.style.cursor = canRedo ? "pointer" : "not-allowed";
+    }
+}
+
+function getSpecificCanvasState(idx) {
+    const targetCanvas = state.cachedFrames[idx];
+    if (targetCanvas) {
+        const ctx = targetCanvas.getContext('2d');
+        return ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+    return null;
+}
+
+// Undo用の履歴保存 (操作前)
+function saveEraserHistory() {
+    let idx = state.eraserFrameIdx || 0;
+    const imgData = getSpecificCanvasState(idx);
+    if (imgData) {
+        eraserState.history.push({
+            frameIdx: idx,
+            imageData: imgData
+        });
+        if (eraserState.history.length > 20) eraserState.history.shift();
+        eraserState.redoHistory = []; // 新しい操作をしたのでredo履歴をクリア
+    }
+    updateUndoRedoButtons();
+}
+
+// Undo実行 (戻る)
+function undoEraser() {
+    if (eraserState.history.length === 0) return;
+    
+    const lastState = eraserState.history.pop();
+    
+    // Redoのために現在の状態を保存
+    const currentImgData = getSpecificCanvasState(lastState.frameIdx);
+    if (currentImgData) {
+        eraserState.redoHistory.push({
+            frameIdx: lastState.frameIdx,
+            imageData: currentImgData
+        });
+    }
+
+    const targetCanvas = state.cachedFrames[lastState.frameIdx];
+    if (targetCanvas) {
+        const ctx = targetCanvas.getContext('2d');
+        ctx.putImageData(lastState.imageData, 0, 0);
+        
+        switchEraserFrame(lastState.frameIdx);
+        updateFrameThumbnail(lastState.frameIdx);
+    }
+    updateUndoRedoButtons();
+}
+
+// Redo実行 (進む)
+function redoEraser() {
+    if (eraserState.redoHistory.length === 0) return;
+    
+    const nextState = eraserState.redoHistory.pop();
+    
+    // Undoのために現在の状態を保存
+    const currentImgData = getSpecificCanvasState(nextState.frameIdx);
+    if (currentImgData) {
+        eraserState.history.push({
+            frameIdx: nextState.frameIdx,
+            imageData: currentImgData
+        });
+    }
+
+    const targetCanvas = state.cachedFrames[nextState.frameIdx];
+    if (targetCanvas) {
+        const ctx = targetCanvas.getContext('2d');
+        ctx.putImageData(nextState.imageData, 0, 0);
+        
+        switchEraserFrame(nextState.frameIdx);
+        updateFrameThumbnail(nextState.frameIdx);
+    }
+    updateUndoRedoButtons();
+}
+
+if (btnUndoEraser) {
+    btnUndoEraser.addEventListener('click', () => {
+        undoEraser();
+    });
+}
+if (btnRedoEraser) {
+    btnRedoEraser.addEventListener('click', () => {
+        redoEraser();
+    });
+}
+
+// マウスイベントの設定
+el.previewCanvas.addEventListener('mousedown', async (e) => {
+    // スポイト処理
+    if (eraserState.isPickingColor) {
+        const pos = getCanvasPos(el.previewCanvas, e);
+        const x = Math.floor(pos.x);
+        const y = Math.floor(pos.y);
+        
+        let targetCanvas = state.cachedFrames[state.eraserFrameIdx || 0];
+        if (!targetCanvas) targetCanvas = el.previewCanvas;
+        
+        const ctx = targetCanvas.getContext('2d');
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        
+        if (pixel[3] > 0) {
+            const hex = "#" + (1 << 24 | pixel[0] << 16 | pixel[1] << 8 | pixel[2]).toString(16).slice(1);
+            eraserState.fillColor = hex;
+            if(el.fillColorPicker) el.fillColorPicker.value = hex;
+        }
+
+        eraserState.isPickingColor = false;
+        if(el.btnPickFillColor) {
+            el.btnPickFillColor.style.background = "#fff";
+            el.btnPickFillColor.innerText = "スポイト";
+        }
+        updateEraserCursor();
+        return;
+    }
+
+    if (!eraserState.isActive) return;
+    
+    let idx = state.eraserFrameIdx || 0;
+    if (!state.cachedFrames[idx]) {
+        const offsetSec = state.outputFrames[idx] ?? 0;
+        state.cachedFrames[idx] = await getProcessedCanvasForOutputOffset(offsetSec);
+    }
+
+    saveEraserHistory();
+
+    eraserState.isDrawing = true;
+    const pos = getCanvasPos(el.previewCanvas, e);
+    eraseAt(pos.x, pos.y);
+});
+
+el.previewCanvas.addEventListener('mousemove', (e) => {
+    if (!eraserState.isActive || !eraserState.isDrawing || eraserState.isPickingColor) return;
+    const pos = getCanvasPos(el.previewCanvas, e);
+    eraseAt(pos.x, pos.y);
+});
+
+window.addEventListener('mouseup', () => {
+    if (eraserState.isDrawing) {
+        eraserState.isDrawing = false;
+        updateFrameThumbnail(state.eraserFrameIdx || 0);
+        updateFrameThumbnail(state.selectedOutputFrame);
+    }
+});
+
+// Undo (Ctrl+Z) / Redo (Ctrl+Y) および書き出し (Ctrl+Enter) のキー操作対応
+document.addEventListener('keydown', (e) => {
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' && (activeEl.type === 'text' || activeEl.type === 'number')) || activeEl.tagName === 'TEXTAREA') {
+        return;
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+        if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') {
+            if (eraserState.history.length > 0) {
+                e.preventDefault();
+                undoEraser();
+            }
+        } else if (e.code === 'KeyY' || e.key.toLowerCase() === 'y') {
+            if (eraserState.redoHistory.length > 0) {
+                e.preventDefault();
+                redoEraser();
+            }
+        } else if (e.code === 'Enter' || e.key === 'Enter') {
+            // 動画を書き出すショートカット (Ctrl + Enter / Cmd + Enter)
+            // ボタンが存在し、かつ無効化(処理中など)されていない場合のみ実行する
+            if (el.btnExport && !el.btnExport.disabled) {
+                e.preventDefault();
+                el.btnExport.click();
+		// 「動画を書き出す」ボタンが画面の中央よりやや上あたりにくるようにスクロール
+                if (el.btnExport) {
+                    el.btnExport.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+    }
+});
+// 消しゴム(ブラシ)サイズ変更（スライダー操作時）
+eraserSizeSlider.addEventListener('input', (e) => {
+    updateEraserSizeUI(e.target.value);
+});
+
+// －（マイナス）ボタンをクリックした時
+document.getElementById('btnEraserSizeDec').addEventListener('click', () => {
+    let currentSize = parseInt(eraserSizeSlider.value, 10); // 現在のサイズを取得
+    if (currentSize > 1) { // サイズが1より大きい時だけ減らす（最小値の制限）
+        currentSize -= 1;
+        updateEraserSizeUI(currentSize);
+    }
+});
+
+// ＋（プラス）ボタンをクリックした時
+document.getElementById('btnEraserSizeInc').addEventListener('click', () => {
+    let currentSize = parseInt(eraserSizeSlider.value, 10); // 現在のサイズを取得
+    if (currentSize < 50) { // サイズが50より小さい時だけ増やす（最大値の制限）
+        currentSize += 1;
+        updateEraserSizeUI(currentSize);
+    }
+});
+
+// 画面のサイズ表示とカーソルを更新する共通の仕組み
+function updateEraserSizeUI(newSize) {
+    eraserSizeSlider.value = newSize; // スライダーのつまみの位置を更新
+    eraserState.size = parseInt(newSize, 10); // 内部のサイズデータを更新
+    eraserSizeDisp.innerText = eraserState.size; // 「15px」などの文字を更新
+    updateEraserCursor(); // 画面上の丸いカーソルの大きさを更新
+}
+
+// 消しゴムプレビュー背景の変更
+document.querySelectorAll('input[name="eraserBgChoice"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const canvas = el.previewCanvas;
+        if(val === "white") { canvas.style.background = "#ffffff"; }
+        else if(val === "black") { canvas.style.background = "#0d0015"; }
+        else if(val === "blue") { canvas.style.background = "#749cbd"; }
+        else { canvas.style.background = "url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/ENAEAA//8IE2EAAM8IE2EAAGQAAA//8IECoFAAAAAElFTkSuQmCC')"; }
+    });
+});
+
+//プレビュー上のフレーム番号を更新する機能
+function updatePreviewFrameNav() {
+    if (!state.outputFrames.length) return; 
+    if (el.currentFrameNum && el.totalFrameNum) {
+        el.currentFrameNum.innerText = (state.eraserFrameIdx || 0) + 1;
+        el.totalFrameNum.innerText = state.outputFrames.length;
+    }
+}
+
+// --- ユーティリティ関数 ---
+const crcTable = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+    crcTable[i] = c;
+}
+function crc32(buf, offset, length) {
+    let crc = 0 ^ (-1);
+    for (let i = 0; i < length; i++) crc = (crc >>> 8) ^ crcTable[(crc ^ buf[offset + i]) & 0xFF];
+    return (crc ^ (-1)) >>> 0;
+}
+function setApngLoopCount(buffer, loopCount) {
+    const view = new DataView(buffer);
+    const u8 = new Uint8Array(buffer);
+    let offset = 8;
+    while (offset < buffer.byteLength) {
+        const length = view.getUint32(offset);
+        const type = String.fromCharCode(u8[offset+4], u8[offset+5], u8[offset+6], u8[offset+7]);
+        if (type === 'acTL') {
+            view.setUint32(offset + 12, loopCount);
+            const crc = crc32(u8, offset + 4, length + 4);
+            view.setUint32(offset + 8 + length, crc);
+            break;
+        }
+        offset += 12 + length;
+    }
+    return buffer;
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : {r:0, g:255, b:0};
+}
+
+let seekMutex = Promise.resolve();
+function seekVideo(video, time) {
+    return new Promise(resolve => {
+        seekMutex = seekMutex.then(() => {
+            return new Promise(innerResolve => {
+                if (Math.abs(video.currentTime - time) < 0.001) {
+                    innerResolve(); resolve(); return;
+                }
+                
+                // フリーズ対策：タイムアウト処理（500ms経過で強制的に次へ進む）
+                let timeoutId = setTimeout(() => {
+                    video.removeEventListener('seeked', onSeeked);
+                    innerResolve(); resolve();
+                }, 500);
+
+                const onSeeked = () => { 
+                    clearTimeout(timeoutId); // 正常に発火したらタイムアウトをキャンセル
+                    video.removeEventListener('seeked', onSeeked); 
+                    innerResolve(); resolve(); 
+                };
+                video.addEventListener('seeked', onSeeked);
+                video.currentTime = time;
+            });
+        });
+    });
+}
+
+// --- 色空間変換関数 (HSV <-> RGB) ---
+function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, v = max;
+    let d = max - min;
+    s = max === 0 ? 0 : d / max;
+    if (max === min) {
+        h = 0; 
+    } else {
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return { h: h * 360, s: s, v: v };
+}
+
+// --- 背景色を自動検出する関数 ---
+async function autoDetectBackgroundColor() {
+    const t = state.startTime + (state.endTime - state.startTime) / 2;
+    await seekVideo(el.hiddenVideo, t);
+    
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = el.hiddenVideo.videoWidth; 
+    srcCanvas.height = el.hiddenVideo.videoHeight;
+    srcCanvas.getContext('2d').drawImage(el.hiddenVideo, 0, 0);
+    
+    const cropCanvas = getCroppedCanvas(srcCanvas, state.cropData);
+    const ctx = cropCanvas.getContext('2d', {willReadFrequently: true});
+    const w = cropCanvas.width;
+    const h = cropCanvas.height;
+    
+    if (w === 0 || h === 0) return state.chromaKeyColor;
+    
+    const imgData = ctx.getImageData(0, 0, w, h).data;
+    const colorCounts = {};
+    let maxCount = 0;
+    let detectedColor = state.chromaKeyColor; 
+
+    const step = 4;
+    
+    for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+            const idx = (y * w + x) * 4;
+            const r = imgData[idx];
+            const g = imgData[idx+1];
+            const b = imgData[idx+2];
+            
+            const qr = r & 0xF0;
+            const qg = g & 0xF0;
+            const qb = b & 0xF0;
+            
+            const key = `${qr},${qg},${qb}`;
+            colorCounts[key] = (colorCounts[key] || 0) + 1;
+            
+            if (colorCounts[key] > maxCount) {
+                maxCount = colorCounts[key];
+                detectedColor = {r, g, b};
+            }
+        }
+    }
+    return detectedColor;
+}
+
+function hsvToRgb(h, s, v) {
+    let r, g, b;
+    h /= 360;
+    if (h < 0) h += 1;
+    let i = Math.floor(h * 6);
+    let f = h * 6 - i;
+    let p = v * (1 - s);
+    let q = v * (1 - f * s);
+    let t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return { r: r * 255, g: g * 255, b: b * 255 };
+}
+
+// --- 画像処理アルゴリズム ---
+function getCroppedCanvas(srcCanvas, cropData) {
+    const cropCanvas = document.createElement('canvas');
+    const cropW = Math.round(cropData.width);
+    const cropH = Math.round(cropData.height);
+    cropCanvas.width = Math.max(1, cropW);
+    cropCanvas.height = Math.max(1, cropH);
+    const ctx = cropCanvas.getContext('2d');
+    const overlapX1 = Math.max(0, cropData.left);
+    const overlapY1 = Math.max(0, cropData.top);
+    const overlapX2 = Math.min(srcCanvas.width, cropData.left + cropW);
+    const overlapY2 = Math.min(srcCanvas.height, cropData.top + cropH);
+    
+    if (overlapX2 > overlapX1 && overlapY2 > overlapY1) {
+        const sw = overlapX2 - overlapX1, sh = overlapY2 - overlapY1;
+        const dx = overlapX1 - cropData.left, dy = overlapY1 - cropData.top;
+        ctx.drawImage(srcCanvas, overlapX1, overlapY1, sw, sh, dx, dy, sw, sh);
+    }
+    return cropCanvas;
+}
+
+function fitImageToTarget(sourceCanvas, targetW, targetH) {
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = targetW; outCanvas.height = targetH;
+    const ctx = outCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    const scale = Math.min(targetW / sourceCanvas.width, targetH / sourceCanvas.height);
+    const newW = sourceCanvas.width * scale;
+    const newH = sourceCanvas.height * scale;
+    const x = Math.floor((targetW - newW) / 2);
+    const y = Math.floor((targetH - newH) / 2);
+    ctx.drawImage(sourceCanvas, x, y, newW, newH);
+    return outCanvas;
+}
+
+// 1. 拡張クロマキー透過 ＆ 色フチ除去 (Despill + Shrink)
+function applyAdvancedChromaKey(canvas, keyColor, tolerance, shrink, despillAmt, despillRange, colorRestore) {
+    const ctx = canvas.getContext('2d', {willReadFrequently: true});
+    const w = canvas.width, h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    
+    const maxDist = 441.67 * (tolerance / 100); 
+    const alphaMap = new Float32Array(w * h);
+
+    for (let i = 0; i < w * h; i++) {
+        const idx = i * 4;
+        if (data[idx+3] === 0) {
+            alphaMap[i] = 0;
+            continue;
+        }
+        const r = data[idx], g = data[idx+1], b = data[idx+2];
+        const dist = Math.sqrt(Math.pow(r - keyColor.r, 2) + Math.pow(g - keyColor.g, 2) + Math.pow(b - keyColor.b, 2));
+        
+        if (dist <= maxDist) {
+            alphaMap[i] = 0;
+        } else if (dist <= maxDist + 20) {
+            alphaMap[i] = (data[idx+3] / 255) * ((dist - maxDist) / 20); 
+        } else {
+            alphaMap[i] = data[idx+3] / 255;
+        }
+    }
+
+    const maxRadius = Math.max(shrink, despillRange);
+    const distMap = new Float32Array(w * h);
+    distMap.fill(maxRadius + 1);
+    const isBoundary = new Uint8Array(w * h);
+    
+    for (let i = 0; i < w * h; i++) {
+        if (alphaMap[i] < 0.95) {
+            distMap[i] = 0;
+            isBoundary[i] = 1;
+        }
+    }
+
+    const maxR = Math.ceil(maxRadius);
+    const r2 = maxRadius * maxRadius;
+    if (maxRadius > 0) {
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                let idx = y * w + x;
+                if (isBoundary[idx]) continue;
+
+                let minDistSq = r2 + 1;
+                for (let dy = -maxR; dy <= maxR; dy++) {
+                    let ny = y + dy;
+                    if (ny < 0 || ny >= h) continue;
+                    for (let dx = -maxR; dx <= maxR; dx++) {
+                        let nx = x + dx;
+                        if (nx < 0 || nx >= w) continue;
+                        
+                        if (isBoundary[ny * w + nx]) {
+                            let d2 = dx*dx + dy*dy;
+                            if (d2 < minDistSq) minDistSq = d2;
+                        }
+                    }
+                }
+                distMap[idx] = Math.sqrt(minDistSq);
+            }
+        }
+    } else {
+        distMap.fill(0);
+    }
+
+    const keyHSV = rgbToHsv(keyColor.r, keyColor.g, keyColor.b);
+    const kr = keyColor.r, kg = keyColor.g, kb = keyColor.b;
+    const maxK = Math.max(kr, kg, kb);
+
+    for (let i = 0; i < w * h; i++) {
+        const idx = i * 4;
+        if (alphaMap[i] === 0) {
+            data[idx+3] = 0;
+            continue;
+        }
+
+        let d = distMap[i];
+        let currentAlpha = alphaMap[i];
+
+        if (shrink > 0 && d <= shrink) {
+            let shrinkFactor = d / shrink;
+            currentAlpha *= shrinkFactor;
+        }
+        data[idx+3] = Math.max(0, Math.min(255, Math.floor(currentAlpha * 255)));
+        
+        if (currentAlpha === 0) continue;
+
+        if (despillAmt > 0 && d <= despillRange) {
+            let r = data[idx], g = data[idx+1], b = data[idx+2];
+            let origHSV = rgbToHsv(r, g, b);
+            
+            let hueDiff = Math.abs(origHSV.h - keyHSV.h);
+            if (hueDiff > 180) hueDiff = 360 - hueDiff;
+
+            if (hueDiff < 90) {
+                let spillFactor = Math.max(0, 1.0 - (hueDiff / 90.0));
+                let edgeFactor = despillRange > 0 ? Math.max(0, 1.0 - (d / despillRange)) : 1.0;
+                let totalDespill = (despillAmt / 100.0) * spillFactor * edgeFactor;
+
+                if (totalDespill > 0) {
+                    let despillR = r, despillG = g, despillB = b;
+                    
+                    if (maxK === kg && kg > kr && kg > kb) { 
+                        let limit = (r + b) / 2.0;
+                        if (g > limit) despillG = g - (g - limit) * totalDespill;
+                    } else if (maxK === kb && kb > kr && kb > kg) { 
+                        let limit = (r + g) / 2.0;
+                        if (b > limit) despillB = b - (b - limit) * totalDespill;
+                    } else if (maxK === kr && kr > kg && kr > kb) { 
+                        let limit = (g + b) / 2.0;
+                        if (r > limit) despillR = r - (r - limit) * totalDespill;
+                    } else {
+                        let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                        despillR = r + (gray - r) * totalDespill;
+                        despillG = g + (gray - g) * totalDespill;
+                        despillB = b + (gray - b) * totalDespill;
+                    }
+
+                    let dHSV = rgbToHsv(despillR, despillG, despillB);
+                    let restoreRatio = colorRestore / 100.0;
+                    
+                    let fHSV = {
+                        h: dHSV.h,
+                        s: dHSV.s * (1 - restoreRatio) + origHSV.s * restoreRatio,
+                        v: dHSV.v * (1 - restoreRatio) + origHSV.v * restoreRatio
+                    };
+
+                    let finalRGB = hsvToRgb(fHSV.h, fHSV.s, fHSV.v);
+                    data[idx] = finalRGB.r;
+                    data[idx+1] = finalRGB.g;
+                    data[idx+2] = finalRGB.b;
+                }
+            }
+        }
+    }
+    
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+}
+
+// 4. 縁取り処理
+function applyBorder(canvas, borderSize) {
+    const ctx = canvas.getContext('2d', {willReadFrequently: true});
+    const w = canvas.width, h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    const r = borderSize, r2 = r * r;
+    const newAlpha = new Uint8Array(w * h);
+    
+    for(let i=0; i<w*h; i++) newAlpha[i] = data[i*4 + 3];
+    for(let y=0; y<h; y++){
+        for(let x=0; x<w; x++){
+            if (data[(y*w+x)*4 + 3] > 0) {
+                for(let dy=-r; dy<=r; dy++){
+                    for(let dx=-r; dx<=r; dx++){
+                        if(dx*dx + dy*dy <= r2) {
+                            const nx = x+dx, ny = y+dy;
+                            if(nx>=0 && nx<w && ny>=0 && ny<h) newAlpha[ny*w+nx] = 255;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for(let i=0; i<w*h; i++){
+        if(newAlpha[i] === 255 && data[i*4 + 3] === 0) {
+            data[i*4] = 255; data[i*4+1] = 255; data[i*4+2] = 255; data[i*4+3] = 255;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+}
+
+// --- 統合透過処理（手描き編集の前段階） ---
+async function processImageDecorations(canvas, offsetSec) {
+    let pCanvas = canvas;
+    
+    if (state.isPickingColor) {
+        return pCanvas;
+    }
+
+    if (state.bgRemovalMethod === 'chromakey') {
+        pCanvas = applyAdvancedChromaKey(
+            pCanvas, 
+            state.chromaKeyColor, 
+            state.chromaTolerance, 
+            state.edgeShrink, 
+            state.despillAmount, 
+            state.despillRange, 
+            state.colorRestore
+        );
+    } 
+    
+    // ※白フチ処理はここでは行わず、最終プレビュー/書き出し時に行うよう変更
+    return pCanvas;
+}
+
+// --- UI更新関数 ---
+function getSourceFrameCount() { return state.sourceFrameCount; }
+function getTargetApngFrameCount() { return Math.max(1, Math.round(state.apngFrameCount)); }
+function getSourceDuration() { return Math.max(0.1, state.endTime - state.startTime); }
+
+function updateApngDuration() { state.apngDuration = parseFloat(el.apngDurationSelect.value || 3); }
+
+function createUniformOutputFrames(count, sourceDuration) {
+    const safeCount = Math.max(1, Math.round(count));
+    const safeDuration = Math.max(0, sourceDuration);
+    const step = safeCount > 1 ? safeDuration / (safeCount - 1) : 0;
+    return Array.from({ length: safeCount }, (_, i) => i * step);
+}
+
+// 修正箇所2: コマ割りを再生成する際、逆再生設定なら最初から配列を反転させる
+function syncOutputFramesToTarget(forceUniform = false) {
+    const target = getTargetApngFrameCount();
+    const sourceDuration = getSourceDuration();
+    if (forceUniform || state.outputFrames.length === 0) {
+        state.outputFrames = createUniformOutputFrames(target, sourceDuration);
+        
+        // 逆再生のチェックが入っていれば配列を反転
+        if (el.useReverse && el.useReverse.checked) {
+            state.outputFrames.reverse();
+        }
+    } else {
+        while (state.outputFrames.length > target) state.outputFrames.pop();
+        while (state.outputFrames.length < target) {
+            const last = state.outputFrames.length ? state.outputFrames[state.outputFrames.length - 1] : 0;
+            state.outputFrames.push(Math.min(sourceDuration, last));
+        }
+    }
+    state.selectedOutputFrame = Math.min(state.selectedOutputFrame, Math.max(0, state.outputFrames.length - 1));
+}
+
+function updateSettingsLogic(sourceElement = null) {
+    let start = parseFloat(el.startSlider.value);
+    let end = parseFloat(el.endSlider.value);
+
+    if (start >= end) {
+        if (sourceElement === el.startSlider) {
+            end = start + 0.1;
+            if (end > state.videoDuration) { end = state.videoDuration; start = end - 0.1; }
+        } else {
+            start = end - 0.1;
+            if (start < 0) { start = 0; end = 0.1; }
+        }
+        el.startSlider.value = start; el.endSlider.value = end;
+    }
+
+    state.startTime = start; state.endTime = end;
+    updateApngDuration();
+    state.apngFrameCount = getSourceFrameCount();
+    state.apngLoopCount = parseInt(el.apngLoopSelect.value || 1, 10);    
+    const sourceDuration = getSourceDuration();
+    if (state.outputFrames.length === 0) {
+        state.outputFrames = createUniformOutputFrames(getTargetApngFrameCount(), sourceDuration);
+        if (el.useReverse && el.useReverse.checked) {
+            state.outputFrames.reverse();
+        }
+    }
+    else state.outputFrames = state.outputFrames.map(t => Math.min(Math.max(0, t), sourceDuration));
+    
+    updateDisplays(false);
+}
+
+function updateDisplays(renderFrames = true) {
+    document.getElementById('startValDisp').innerText = parseFloat(el.startSlider.value).toFixed(1);
+    document.getElementById('endValDisp').innerText = parseFloat(el.endSlider.value).toFixed(1);
+    el.sourceFrameCountValDisp.innerText = el.sourceFrameCountSlider.value;
+    document.getElementById('borderValDisp').innerText = el.borderSlider.value;
+    
+    document.getElementById('chromaTolValDisp').innerText = el.chromaTolSlider.value;
+    document.getElementById('shrinkTolValDisp').innerText = el.shrinkTolSlider.value;
+    document.getElementById('despillValDisp').innerText = el.despillSlider.value;
+    document.getElementById('despillRangeValDisp').innerText = el.despillRangeSlider.value;
+    document.getElementById('colorRestoreValDisp').innerText = el.colorRestoreSlider.value;
+
+    state.startTime = parseFloat(el.startSlider.value);
+    state.endTime = parseFloat(el.endSlider.value);
+    state.sourceFrameCount = parseInt(el.sourceFrameCountSlider.value, 10);
+    state.apngDuration = parseFloat(el.apngDurationSelect.value);
+    state.apngLoopCount = parseInt(el.apngLoopSelect.value);
+    
+    state.chromaTolerance = parseInt(el.chromaTolSlider.value);
+    state.edgeShrink = parseFloat(el.shrinkTolSlider.value);
+    state.despillAmount = parseInt(el.despillSlider.value);
+    state.despillRange = parseInt(el.despillRangeSlider.value);
+    state.colorRestore = parseInt(el.colorRestoreSlider.value);
+
+    state.previewFrameIdx = 1;
+    state.borderSize = parseInt(el.borderSlider.value);
+
+    const sourceFrames = getSourceFrameCount();
+    const targetFrames = getTargetApngFrameCount();
+    const sourceDuration = getSourceDuration();
+    
+    document.getElementById('statusText').innerHTML = `動画素材: <strong>${state.startTime.toFixed(1)}秒 ～ ${state.endTime.toFixed(1)}秒</strong> (<strong>${sourceFrames}コマ</strong>) ／ APNG: <strong>${state.apngDuration}秒・${targetFrames}コマ</strong>`;
+    
+    const perFrameMs = targetFrames > 0 ? (state.apngDuration * 1000 / targetFrames) : 0;
+    el.apngStatusText.innerHTML = `APNG設定: <strong>${state.apngDuration}秒・${targetFrames}コマ</strong> ／ 1コマ平均 <strong>${perFrameMs.toFixed(1)}ms</strong>` +
+        (state.apngDuration > 4 ? ` ／ <span style="color:#b42318;font-weight:bold;">LINEの公式規定(4秒以内)を超えています</span>` : '');
+
+    if (state.apngDuration > 4) document.getElementById('durationWarning').classList.remove('hidden');
+    else document.getElementById('durationWarning').classList.add('hidden');
+    
+    if (renderFrames) {
+        triggerPreviewUpdate();
+    }
+    
+    el.frameCountInfo.innerText = `編集中: ${state.outputFrames.length}コマ ／ 設定: ${targetFrames}コマ ／ 素材の長さ(${sourceDuration.toFixed(1)}秒)から均等に抽出` +
+        (state.outputFrames.length !== targetFrames ? ' ／ 手動編集後のコマ数です' : '');
+}
+
+function bindControl(btnDec, input, btnInc, onInputCallback, onChangeCallback) {
+    btnDec.addEventListener('click', () => { 
+        if(!input.disabled) { 
+            input.value = Math.max(parseFloat(input.min), parseFloat(input.value) - parseFloat(input.step)); 
+            if(onInputCallback) onInputCallback();
+            if(onChangeCallback) onChangeCallback();
+        } 
+    });
+    btnInc.addEventListener('click', () => { 
+        if(!input.disabled) { 
+            input.value = Math.min(parseFloat(input.max), parseFloat(input.value) + parseFloat(input.step)); 
+            if(onInputCallback) onInputCallback();
+            if(onChangeCallback) onChangeCallback();
+        } 
+    });
+    if(onInputCallback) input.addEventListener('input', onInputCallback);
+    if(onChangeCallback) input.addEventListener('change', onChangeCallback);
+}
+
+// --- APNGコマ編集・描画用 ---
+function sourceFrameTime(sourceIndex) {
+    if (state.sourceFrameCount <= 1) return state.startTime;
+    const ratio = sourceIndex / (state.sourceFrameCount - 1);
+    const time = state.startTime + ratio * (state.endTime - state.startTime);
+    return Math.min(time, Math.max(0, state.videoDuration - 0.001));
+}
+
+function outputFrameTime(offsetSec) {
+    return Math.min(state.startTime + Math.max(0, Math.min(offsetSec, getSourceDuration())), Math.max(0, state.videoDuration - 0.001));
+}
+
+async function getProcessedCanvasForOutputOffset(offsetSec) {
+    await seekVideo(el.hiddenVideo, outputFrameTime(offsetSec));
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = el.hiddenVideo.videoWidth;
+    srcCanvas.height = el.hiddenVideo.videoHeight;
+    srcCanvas.getContext('2d').drawImage(el.hiddenVideo, 0, 0);
+    const cropCanvas = getCroppedCanvas(srcCanvas, state.cropData);
+    let pCanvas = fitImageToTarget(cropCanvas, state.targetW, state.targetH);
+    pCanvas = await processImageDecorations(pCanvas, offsetSec);
+    return pCanvas;
+}
+
+async function renderFrameStrip() {
+    const token = ++state.renderToken; 
+    el.frameStrip.innerHTML = '';    
+    state.cachedFrames = [];
+    
+    if (!state.outputFrames.length || !state.videoDuration) return;
+    
+    for (let i = 0; i < state.outputFrames.length; i++) {
+        if (token !== state.renderToken) return; 
+
+        const offsetSec = state.outputFrames[i];
+        const pCanvas = await getProcessedCanvasForOutputOffset(offsetSec);
+        
+        if (token !== state.renderToken) return; 
+
+        state.cachedFrames[i] = pCanvas;
+        const thumb = document.createElement('img');
+        thumb.src = pCanvas.toDataURL('image/jpeg', 0.65);
+        
+        const item = document.createElement('div');
+        item.className = 'frame-item' + (i === state.selectedOutputFrame ? ' selected' : '');
+        const originalSec = state.startTime + offsetSec;
+        item.innerHTML = `<span class="frame-no">${i + 1}</span><span class="frame-source">${originalSec.toFixed(2)}s</span>`;
+        item.appendChild(thumb);
+        item.addEventListener('click', () => {
+            state.selectedOutputFrame = i;
+            updateDisplays(false);
+            highlightSelectedFrameItem();
+            previewEditedSequence();
+        });
+        el.frameStrip.appendChild(item);
+    }
+    updateEraserFrameSelectOptions();
+    updatePreviewFrameNav();
+}
+
+function updatePlayPauseButton() {
+    if (!el.btnPlayPause) return;
+    el.btnPlayPause.innerText = state.previewPlaying ? '⏸ 一時停止' : '▶ 再生';
+    el.btnPlayPause.classList.toggle('playing', state.previewPlaying);
+}
+
+function stopEditorPreviewTimer() {
+    if (state.previewTimer) clearInterval(state.previewTimer);
+    state.previewTimer = null;
+    state.previewToken++;
+}
+
+async function showEditorFrame(index, updateSelection = true) {
+    if (!state.outputFrames.length) return;
+    const safeIndex = Math.max(0, Math.min(index, state.outputFrames.length - 1));
+    if (updateSelection) state.selectedOutputFrame = safeIndex;
+    
+    let canvas = state.cachedFrames[safeIndex];
+    if (!canvas) {
+        const offsetSec = state.outputFrames[safeIndex] ?? 0;
+        canvas = await getProcessedCanvasForOutputOffset(offsetSec);
+        state.cachedFrames[safeIndex] = canvas;
+    }
+
+    // 【追加】ここで白フチ処理用のコピーキャンバスを作成
+    let displayCanvas = canvas;
+    if (el.useBorder.checked && state.borderSize > 0) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+        displayCanvas = applyBorder(tempCanvas, state.borderSize);
+    }
+    
+    el.editorAnimCanvas.width = state.targetW;
+    el.editorAnimCanvas.height = state.targetH;
+    el.editorAnimCanvas.getContext('2d').clearRect(0,0,state.targetW, state.targetH);
+    el.editorAnimCanvas.getContext('2d').drawImage(displayCanvas, 0, 0); // displayCanvasを描画
+}
+
+function highlightSelectedFrameItem() {
+    const items = el.frameStrip.querySelectorAll('.frame-item');
+    items.forEach((item, i) => { item.classList.toggle('selected', i === state.selectedOutputFrame); });
+    const selectedItem = items[state.selectedOutputFrame];
+    if (!selectedItem) return;
+
+    const container = el.frameStrip;
+    const itemCenter = selectedItem.offsetLeft + selectedItem.offsetWidth / 2;
+    const targetLeft = itemCenter - container.clientWidth / 2;
+    const maxLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+
+    container.scrollTo({
+        left: Math.max(0, Math.min(targetLeft, maxLeft)),
+        behavior: state.previewPlaying ? 'auto' : 'smooth'
+    });
+}
+
+// 修正箇所3: 逆順配列を用意したので、プレビューは常に左から右へ再生
+function restartEditorPreviewTimer(startFromSelected = true) {
+    stopEditorPreviewTimer();
+    if (!state.outputFrames.length || !state.previewPlaying) { updatePlayPauseButton(); return; }
+    let idx = startFromSelected ? state.selectedOutputFrame : 0;
+    const token = state.previewToken;
+    const frameDelayMs = state.outputFrames.length ? (state.apngDuration * 1000 / state.outputFrames.length) : 100;
+
+   const tick = async () => {
+        if (token !== state.previewToken || !state.outputFrames.length || !state.previewPlaying) return;
+        
+        const numFrames = state.outputFrames.length;
+        let playIndex = ((idx % numFrames) + numFrames) % numFrames;
+        
+        // 再生中のコマを選択状態にしてキャンバスを更新
+        await showEditorFrame(playIndex, true);
+        
+        // 選択枠（赤枠）を動かす
+        highlightSelectedFrameItem(); 
+        
+        if (token !== state.previewToken || !state.previewPlaying) return;
+        
+        idx++; // 常に左から右（配列のインデックス順）に進める
+        
+        state.previewTimer = setTimeout(tick, Math.max(10, Math.round(frameDelayMs)));
+    };
+    tick();
+    updatePlayPauseButton();
+}
+
+async function previewEditedSequence() {
+    updatePlayPauseButton();
+    if (state.previewPlaying) {
+        restartEditorPreviewTimer(true);
+    } else {
+        stopEditorPreviewTimer();
+        await showEditorFrame(state.selectedOutputFrame, true);
+        highlightSelectedFrameItem();
+    }
+}
+
+async function selectEditorFrame(index) {
+    if (!state.outputFrames.length) return;
+    state.selectedOutputFrame = Math.max(0, Math.min(index, state.outputFrames.length - 1));
+    updateDisplays(false);
+    highlightSelectedFrameItem();
+    await previewEditedSequence();
+    highlightSelectedFrameItem();
+}
+
+// --- プレビュー生成・クロッパー操作 ---
+async function generateTimeline() {
+    el.timelineContainer.innerHTML = '';
+    const numThumbs = 8;
+    for(let i=0; i<numThumbs; i++){
+        let t = state.startTime + ((state.endTime - state.startTime) * i / (numThumbs - 1));
+        if(isNaN(t)) t = 0;
+        t = Math.min(t, state.videoDuration - 0.05);
+        await seekVideo(el.hiddenVideo, t);
+        const c = document.createElement('canvas');
+        const r = 80 / el.hiddenVideo.videoHeight;
+        c.width = el.hiddenVideo.videoWidth * r; c.height = 80;
+        c.getContext('2d').drawImage(el.hiddenVideo, 0, 0, c.width, c.height);
+        const img = document.createElement('img');
+        img.src = c.toDataURL('image/jpeg', 0.5);
+        el.timelineContainer.appendChild(img);
+    }
+}
+
+async function updatePreview() {
+    if(!state.cropper) return;
+    const offsetSec = Math.max(0, (state.previewFrameIdx - 1) * getSourceDuration() / Math.max(1, state.sourceFrameCount - 1));
+    const pCanvas = await getProcessedCanvasForOutputOffset(offsetSec);
+    el.previewCanvas.width = state.targetW; el.previewCanvas.height = state.targetH;
+    el.previewCanvas.getContext('2d').clearRect(0,0,state.targetW, state.targetH);
+    el.previewCanvas.getContext('2d').drawImage(pCanvas, 0, 0);
+    applyPreviewZoom();
+}
+
+async function triggerPreviewUpdate() {
+    el.loadingOverlay.style.display = 'flex';
+    await updatePreview();
+    await renderFrameStrip();
+    await previewEditedSequence();
+    updateEraserCursor();
+    
+    // 【追加】動画読み込み時や設定変更時は、消しゴム画面をフレーム1にリセットする
+    state.eraserFrameIdx = 0;
+    await switchEraserFrame(0);
+    
+    el.loadingOverlay.style.display = 'none';
+}
+
+function getCurrentCropperData() {
+    if (!state.cropper) return null;
+    const data = state.cropper.getData(true);
+    return { x: data.x, y: data.y, width: data.width, height: data.height };
+}
+
+function centerCropBoth() {
+    if (!state.cropper) return;
+    const crop = getCurrentCropperData();
+    const image = state.cropper.getImageData();
+    const x = (image.naturalWidth - crop.width) / 2, y = (image.naturalHeight - crop.height) / 2;
+    state.cropper.setData({ x, y, width: crop.width, height: crop.height });
+    state.cropData = { left: x, top: y, width: crop.width, height: crop.height };
+    triggerPreviewUpdate();
+}
+function centerCropHorizontal() {
+    if (!state.cropper) return;
+    const crop = getCurrentCropperData();
+    const image = state.cropper.getImageData();
+    const x = (image.naturalWidth - crop.width) / 2;
+    state.cropper.setData({ x, y: crop.y, width: crop.width, height: crop.height });
+    state.cropData = { left: x, top: crop.y, width: crop.width, height: crop.height };
+    triggerPreviewUpdate();
+}
+function centerCropVertical() {
+    if (!state.cropper) return;
+    const crop = getCurrentCropperData();
+    const image = state.cropper.getImageData();
+    const y = (image.naturalHeight - crop.height) / 2;
+    state.cropper.setData({ x: crop.x, y, width: crop.width, height: crop.height });
+    state.cropData = { left: crop.x, top: y, width: crop.width, height: crop.height };
+    triggerPreviewUpdate();
+}
+
+async function initCropper() {
+    return new Promise(async (resolve) => {
+        await seekVideo(el.hiddenVideo, state.startTime);
+        const c = document.createElement('canvas');
+        c.width = el.hiddenVideo.videoWidth; c.height = el.hiddenVideo.videoHeight;
+        c.getContext('2d').drawImage(el.hiddenVideo, 0, 0);
+        el.cropperImage.src = c.toDataURL('image/jpeg', 0.8);
+        el.cropperWrapper.style.display = 'block';
+        
+        let prevData = null;
+        let prevCanvasData = null;
+        if(state.cropper) {
+            prevData = state.cropper.getData(true);
+            prevCanvasData = state.cropper.getCanvasData();
+            state.cropper.destroy();
+        }
+        state.cropper = new Cropper(el.cropperImage, {
+            aspectRatio: state.targetW / state.targetH,
+            viewMode: 0, dragMode: 'move', autoCropArea: 0.8,
+            zoom: (e) => {
+                if (el.cropZoomSlider) {
+                    el.cropZoomSlider.value = e.detail.ratio;
+                }
+                
+                if (cropUpdateTimer) clearTimeout(cropUpdateTimer);
+                cropUpdateTimer = setTimeout(() => {
+                    if (state.cropper) {
+                        const data = state.cropper.getData(true);
+                        state.cropData = { left: data.x, top: data.y, width: data.width, height: data.height };
+                        triggerPreviewUpdate();
+                    }
+                }, 300);
+            },
+            cropend: () => {
+                const data = state.cropper.getData(true);
+                state.cropData = { left: data.x, top: data.y, width: data.width, height: data.height };
+                triggerPreviewUpdate();
+            },
+            ready: () => {
+                if(prevCanvasData) {
+                    state.cropper.setCanvasData(prevCanvasData);
+                }
+                if(prevData) {
+                    state.cropper.setData(prevData);
+                }
+                const data = state.cropper.getData(true);
+                state.cropData = { left: data.x, top: data.y, width: data.width, height: data.height };
+                
+                const canvasData = state.cropper.getCanvasData();
+                const imageData = state.cropper.getImageData();
+                const initialRatio = canvasData.width / imageData.naturalWidth;
+                if (el.cropZoomSlider) {
+                    el.cropZoomSlider.value = initialRatio;
+                }
+                
+                updatePreview();
+                resolve();
+            }
+        });
+    });
+}
+function handleVideoFile(file) {
+    if (!file) return;
+    state.videoFile = file;
+    let baseName = file.name.split('.').slice(0, -1).join('.');
+    el.filenameInput.value = baseName || "01";
+    el.hiddenVideo.src = URL.createObjectURL(file);
+}
+
+// --- UIイベントリスナー ---
+
+el.uploadArea.addEventListener('click', () => {
+    el.videoUpload.click(); // 隠れているinputタグ(ファイル選択)をプログラムからクリックする
+});
+
+el.videoUpload.addEventListener('change', (e) => { handleVideoFile(e.target.files[0]); });
+el.uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); el.uploadArea.classList.add('dragover'); });el.uploadArea.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); el.uploadArea.classList.remove('dragover'); });
+el.uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation(); el.uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleVideoFile(e.dataTransfer.files[0]);
+});
+
+el.hiddenVideo.addEventListener('loadeddata', async () => {
+    state.videoDuration = el.hiddenVideo.duration;
+    el.startSlider.max = state.videoDuration; el.endSlider.max = state.videoDuration;
+    
+    let curStart = parseFloat(el.startSlider.value);
+    let curEnd = parseFloat(el.endSlider.value);
+    
+    if (isNaN(curStart)) curStart = 0;
+    if (isNaN(curEnd) || curEnd === 0) curEnd = 4.0;
+    
+    state.endTime = Math.min(curEnd, state.videoDuration);
+    state.startTime = Math.min(curStart, Math.max(0, state.endTime - 0.1));
+    
+    el.startSlider.value = state.startTime;
+    el.endSlider.value = state.endTime;    
+    el.mainUI.classList.remove('hidden'); el.resultArea.style.display = 'none';
+    state.selectedOutputFrame = 0; state.previewPlaying = true;
+    
+    updateSettingsLogic();
+    syncOutputFramesToTarget(true);
+    await generateTimeline();
+    await initCropper();
+
+    const initialBgColor = await autoDetectBackgroundColor();
+    state.chromaKeyColor = initialBgColor;
+    const initialHex = "#" + (1 << 24 | initialBgColor.r << 16 | initialBgColor.g << 8 | initialBgColor.b).toString(16).slice(1);
+    if (el.chromaKeyColor) el.chromaKeyColor.value = initialHex;
+    
+    el.loadingOverlay.style.display = 'flex';
+    await renderFrameStrip();
+    await previewEditedSequence();
+    el.loadingOverlay.style.display = 'none';
+});
+
+el.btnPlayPause.addEventListener('click', async () => {
+    state.previewPlaying = !state.previewPlaying;
+    updatePlayPauseButton();
+    if (state.previewPlaying) restartEditorPreviewTimer(true);
+    else { stopEditorPreviewTimer(); await showEditorFrame(state.selectedOutputFrame, true); highlightSelectedFrameItem(); updatePlayPauseButton(); }
+});
+
+// ------------------------------------------------------------
+// 【追加機能】全秒数を指定するボタンのイベントリスナー
+// ------------------------------------------------------------
+if (el.btnSetFullDuration) {
+    el.btnSetFullDuration.addEventListener('click', async () => {
+        if (!state.videoDuration) return;
+
+        el.startSlider.value = 0;
+        el.endSlider.value = state.videoDuration;
+
+        updateSettingsLogic();
+        updateDisplays(false);
+        updateApngDuration();
+        syncOutputFramesToTarget(true);
+        await generateTimeline();
+        await initCropper();
+
+        state.previewPlaying = true;
+        updatePlayPauseButton();
+        triggerPreviewUpdate();
+    });
+}
+
+bindControl(document.getElementById('btnStartDec'), el.startSlider, document.getElementById('btnStartInc'), 
+    () => { updateSettingsLogic(el.startSlider); updateDisplays(false); }, 
+    async () => {
+    updateApngDuration(); syncOutputFramesToTarget(true);
+    await generateTimeline(); await initCropper();
+
+    state.previewPlaying = true;
+    updatePlayPauseButton();
+    triggerPreviewUpdate();
+});
+
+bindControl(document.getElementById('btnEndDec'), el.endSlider, document.getElementById('btnEndInc'), 
+    () => { updateSettingsLogic(el.endSlider); updateDisplays(false); }, 
+    async () => {
+    updateApngDuration(); syncOutputFramesToTarget(true);
+    await generateTimeline(); await initCropper();
+
+    state.previewPlaying = true;
+    updatePlayPauseButton();
+    triggerPreviewUpdate();
+});
+
+bindControl(document.getElementById('btnSourceFrameCountDec'), el.sourceFrameCountSlider, document.getElementById('btnSourceFrameCountInc'), 
+    () => { state.sourceFrameCount = parseInt(el.sourceFrameCountSlider.value, 10); updateSettingsLogic(); updateDisplays(false); }, 
+    async () => {
+        syncOutputFramesToTarget(true); await generateTimeline(); await initCropper();
+        triggerPreviewUpdate();
+    }
+);
+
+el.apngDurationSelect.addEventListener('change', () => { 
+    state.apngDuration = parseFloat(el.apngDurationSelect.value);
+
+    state.previewPlaying = true;
+    updatePlayPauseButton();
+
+    updateDisplays(false); 
+    triggerPreviewUpdate(); 
+});
+
+el.btnPrevFrame.addEventListener('click', async () => { 
+    let targetIndex = state.selectedOutputFrame - 1;
+    if (targetIndex < 0) targetIndex = state.outputFrames.length - 1;
+    await selectEditorFrame(targetIndex); 
+    highlightSelectedFrameItem(); 
+});
+
+el.btnNextFrame.addEventListener('click', async () => { 
+    let targetIndex = state.selectedOutputFrame + 1;
+    if (targetIndex >= state.outputFrames.length) targetIndex = 0;
+    await selectEditorFrame(targetIndex); 
+    highlightSelectedFrameItem(); 
+});
+
+
+// プレビューの「前のフレームへ」ボタンをクリックしたときの処理
+el.btnPreviewPrev.addEventListener('click', async () => {
+    if (!state.outputFrames.length) return;
+
+    // 【修正】裏で動いている変数ではなく、現在手描き編集枠のプルダウンで選択されているコマを基準にする
+    let currentIndex = parseInt(eraserFrameSelect.value, 10);
+    let targetIndex = currentIndex - 1;
+
+    // もし最初のコマ(0未満)になったら、一番最後のコマに移動する
+    if (targetIndex < 0) {
+        targetIndex = state.outputFrames.length - 1;
+    }
+
+    // 作業用キャンバスも含めてすべて強制的に書き換える
+    await switchEraserFrame(targetIndex);
+});
+
+// プレビューの「次のフレームへ」ボタンをクリックしたときの処理
+el.btnPreviewNext.addEventListener('click', async () => {
+    if (!state.outputFrames.length) return;
+
+    // 【修正】裏で動いている変数ではなく、現在手描き編集枠のプルダウンで選択されているコマを基準にする
+    let currentIndex = parseInt(eraserFrameSelect.value, 10);
+    let targetIndex = currentIndex + 1;
+
+    // もし最後のコマを超えたら、最初のコマ(0)に戻る
+    if (targetIndex >= state.outputFrames.length) {
+        targetIndex = 0;
+    }
+
+    // 作業用キャンバスも含めてすべて強制的に書き換える
+    await switchEraserFrame(targetIndex);
+});
+
+
+// --- APNG再生時間変更時に、ループ回数を自動調整する機能 ---
+el.apngDurationSelect.addEventListener('change', (e) => {
+    const timeValue = parseFloat(e.target.value);
+    
+    // 秒数に応じて適切なループ回数を設定（LINEスタンプの規定対策）
+    if (timeValue === 1) {
+        el.apngLoopSelect.value = "4";
+    } else if (timeValue === 1.5 || timeValue === 2) {
+        el.apngLoopSelect.value = "2";	
+    } else if (timeValue === 3 || timeValue === 4) {
+        el.apngLoopSelect.value = "1";
+    }
+    
+    // UIの表示状態（state）を最新の状態に同期させる
+    state.apngLoopCount = parseInt(el.apngLoopSelect.value, 10);
+});
+
+el.btnDuplicateFrame.addEventListener('click', () => {
+    if (!state.outputFrames.length) return;
+    const value = state.outputFrames[state.selectedOutputFrame];
+    state.outputFrames.splice(state.selectedOutputFrame + 1, 0, value);
+    state.cachedFrames.splice(state.selectedOutputFrame + 1, 0, state.cachedFrames[state.selectedOutputFrame]);
+    state.selectedOutputFrame += 1;
+    updateDisplays(false); triggerPreviewUpdate();
+});
+
+el.btnDeleteFrame.addEventListener('click', () => {
+    if (state.outputFrames.length <= 1) { alert('最低1コマは必要です。'); return; }
+    state.outputFrames.splice(state.selectedOutputFrame, 1);
+    state.cachedFrames.splice(state.selectedOutputFrame, 1);
+    state.selectedOutputFrame = Math.min(state.selectedOutputFrame, state.outputFrames.length - 1);
+    updateDisplays(false); triggerPreviewUpdate();
+});
+
+el.btnMoveToFirstFrame.addEventListener('click', () => {
+    if (!state.outputFrames.length) return;
+
+    const timeValue = state.outputFrames[state.selectedOutputFrame];
+    const canvasData = state.cachedFrames[state.selectedOutputFrame];
+    
+    state.outputFrames.unshift(timeValue);
+    state.cachedFrames.unshift(canvasData);
+    
+    state.selectedOutputFrame = 0;
+    
+    updateDisplays(false); 
+    triggerPreviewUpdate();
+});
+
+el.btnResetFrames.addEventListener('click', async () => {
+    if (confirm('コマの削除や複製などの編集をリセットし、初期の均等なコマ割りに戻しますか？')) {
+        el.loadingOverlay.style.display = 'flex'; // ローディング画面を表示
+        syncOutputFramesToTarget(true); // コマ割りを初期化(均等割りに戻す)
+        state.selectedOutputFrame = 0; // 最初のコマを選択状態にする
+        updateDisplays(false); 
+        await triggerPreviewUpdate(); // プレビューとサムネイルを再生成
+        el.loadingOverlay.style.display = 'none'; // ローディング画面を非表示
+    }
+});
+
+// 修正箇所1: 逆再生チェックを切り替えたら、直ちに配列と画面を反転させる
+el.useReverse.addEventListener('change', async () => {
+    // データ配列そのものを反転させる
+    state.outputFrames.reverse();
+    state.cachedFrames.reverse();
+    
+    // 現在選択されているコマのインデックスも反転後の位置に合わせる
+    if (state.outputFrames.length > 0) {
+        state.selectedOutputFrame = state.outputFrames.length - 1 - state.selectedOutputFrame;
+    }
+    
+    el.loadingOverlay.style.display = 'flex';
+    updateDisplays(false);
+    await triggerPreviewUpdate();
+    el.loadingOverlay.style.display = 'none';
+});
+
+el.btnCropCenterBoth.addEventListener('click', () => centerCropBoth());
+el.btnCropCenterHorizontal.addEventListener('click', () => centerCropHorizontal());
+el.btnCropCenterVertical.addEventListener('click', () => centerCropVertical());
+
+// --- ズームスライダー操作 ---
+function updateZoomFromSlider() {
+    if (!state.cropper) return;
+    const ratio = parseFloat(el.cropZoomSlider.value);
+    state.cropper.zoomTo(ratio);
+    
+    const data = state.cropper.getData(true);
+    state.cropData = { left: data.x, top: data.y, width: data.width, height: data.height };
+    
+    if (cropUpdateTimer) clearTimeout(cropUpdateTimer);
+    cropUpdateTimer = setTimeout(() => { triggerPreviewUpdate(); }, 300);
+}
+
+if (el.cropZoomSlider) {
+    el.cropZoomSlider.addEventListener('input', updateZoomFromSlider);
+}
+if (el.btnZoomIn) {
+    el.btnZoomIn.addEventListener('click', () => {
+        if (!state.cropper) return;
+        const current = parseFloat(el.cropZoomSlider.value);
+        const next = Math.min(parseFloat(el.cropZoomSlider.max), current + parseFloat(el.cropZoomSlider.step));
+        el.cropZoomSlider.value = next;
+        updateZoomFromSlider();
+    });
+}
+if (el.btnZoomOut) {
+    el.btnZoomOut.addEventListener('click', () => {
+        if (!state.cropper) return;
+        const current = parseFloat(el.cropZoomSlider.value);
+        const next = Math.max(parseFloat(el.cropZoomSlider.min), current - parseFloat(el.cropZoomSlider.step));
+        el.cropZoomSlider.value = next;
+        updateZoomFromSlider();
+    });
+}
+
+const customSizeInputs = document.getElementById('customSizeInputs');
+const customWidth = document.getElementById('customWidth');
+const customHeight = document.getElementById('customHeight');
+
+document.querySelectorAll('input[name="outputType"]').forEach(radio => {
+    radio.addEventListener('change', async (e) => {
+        const val = e.target.value;
+        
+        if (val === "custom") {
+            customSizeInputs.classList.remove('hidden');
+            state.targetW = parseInt(customWidth.value) || 300;
+            state.targetH = parseInt(customHeight.value) || 300;
+            state.maxSizeKb = 1000;
+            state.outputTypeStr = `カスタムサイズ (${state.targetW}x${state.targetH})`;
+        } else {
+            customSizeInputs.classList.add('hidden');
+            if(val === "pop320"){ state.targetW = 480; state.targetH = 480; state.maxSizeKb = 1000; state.outputTypeStr = "ポップアップ・エフェクトスタンプ (480 × 480)"; }
+            else if(val === "anim320"){ state.targetW = 320; state.targetH = 270; state.maxSizeKb = 1000; state.outputTypeStr = "アニメーションスタンプ (320x270)"; }
+            else { state.targetW = 180; state.targetH = 180; state.maxSizeKb = 300; state.outputTypeStr = "アニメーション絵文字 (180x180)"; }
+        }
+        
+        if(state.cropper) {
+            state.cropper.setAspectRatio(state.targetW / state.targetH);
+            const crop = getCurrentCropperData();
+            if (crop) state.cropData = { left: crop.x, top: crop.y, width: crop.width, height: crop.height };
+        }
+        triggerPreviewUpdate();
+    });
+});
+
+function updateCustomSize() {
+    const radioCustom = document.querySelector('input[name="outputType"][value="custom"]');
+    if (radioCustom && radioCustom.checked) {
+        state.targetW = parseInt(customWidth.value) || 300;
+        state.targetH = parseInt(customHeight.value) || 300;
+        state.outputTypeStr = `カスタムサイズ (${state.targetW}x${state.targetH})`;
+        
+        if (state.cropper) {
+            state.cropper.setAspectRatio(state.targetW / state.targetH);
+            const crop = getCurrentCropperData();
+            if (crop) state.cropData = { left: crop.x, top: crop.y, width: crop.width, height: crop.height };
+        }
+        triggerPreviewUpdate();
+    }
+}
+customWidth.addEventListener('change', updateCustomSize);
+customHeight.addEventListener('change', updateCustomSize);
+
+// --- 背景透過メソッド切り替え ---
+document.querySelectorAll('input[name="bgRemovalMethod"]').forEach(radio => {
+    radio.addEventListener('change', async (e) => {
+        state.bgRemovalMethod = e.target.value;
+       
+        el.chromakeySettings.classList.toggle('hidden', state.bgRemovalMethod !== 'chromakey');
+        
+        if(state.bgRemovalMethod === 'chromakey') document.getElementById('previewInstruction').innerText = state.isPickingColor ? "（クリックで色を取得します）" : "";
+        else document.getElementById('previewInstruction').innerText = "";
+        
+        triggerPreviewUpdate();
+    });
+});
+
+el.chromaKeyColor.addEventListener('input', (e) => {
+    state.chromaKeyColor = hexToRgb(e.target.value);
+    triggerPreviewUpdate();
+});
+bindControl(document.getElementById('btnChromaTolDec'), el.chromaTolSlider, document.getElementById('btnChromaTolInc'), 
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+bindControl(document.getElementById('btnShrinkTolDec'), el.shrinkTolSlider, document.getElementById('btnShrinkTolInc'),
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+bindControl(document.getElementById('btnDespillDec'), el.despillSlider, document.getElementById('btnDespillInc'),
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+bindControl(document.getElementById('btnDespillRangeDec'), el.despillRangeSlider, document.getElementById('btnDespillRangeInc'),
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+bindControl(document.getElementById('btnColorRestoreDec'), el.colorRestoreSlider, document.getElementById('btnColorRestoreInc'),
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+
+el.btnPickChromaColor.addEventListener('click', () => {
+    state.isPickingColor = !state.isPickingColor;
+    if (state.isPickingColor) {
+        el.btnPickChromaColor.style.background = "#ffb3b3";
+        el.btnPickChromaColor.innerText = "キャンセル (プレビュー画像をクリック)";
+        document.getElementById('previewInstruction').innerText = "（クリックで色を取得します）";
+        
+        // クロマキー用スポイトをONにした時、手描き用スポイトを強制OFFにする
+        if (eraserState.isPickingColor) {
+            eraserState.isPickingColor = false;
+            if(el.btnPickFillColor) {
+                el.btnPickFillColor.style.background = "#fff";
+                el.btnPickFillColor.innerText = "スポイト";
+            }
+            updateEraserCursor();
+        }
+    } else {
+        el.btnPickChromaColor.style.background = "";
+        el.btnPickChromaColor.innerText = "プレビューから色をスポイト";
+        document.getElementById('previewInstruction').innerText = "";
+    }
+    // ボタンのON/OFFを切り替えた直後にプレビューを更新する
+    triggerPreviewUpdate(); 
+});
+el.btnAutoDetectColor.addEventListener('click', async () => {
+    el.btnAutoDetectColor.innerText = "⏳ 検出中...";
+    el.btnAutoDetectColor.disabled = true;
+    
+    const col = await autoDetectBackgroundColor();
+    
+    state.chromaKeyColor = col;
+    const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
+    el.chromaKeyColor.value = hex;
+    
+    el.btnAutoDetectColor.innerText = "✨ 自動検出";
+    el.btnAutoDetectColor.disabled = false;
+    triggerPreviewUpdate();
+});
+
+async function getRawPreviewPixel(x, y) {
+    const t = sourceFrameTime(Math.max(0, state.previewFrameIdx - 1));
+    await seekVideo(el.hiddenVideo, t);
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = el.hiddenVideo.videoWidth; srcCanvas.height = el.hiddenVideo.videoHeight;
+    srcCanvas.getContext('2d').drawImage(el.hiddenVideo, 0, 0);
+    const cropCanvas = getCroppedCanvas(srcCanvas, state.cropData);
+    let processCanvas = fitImageToTarget(cropCanvas, state.targetW, state.targetH);
+    const ctx = processCanvas.getContext('2d');
+    const pixel = ctx.getImageData(x, y, 1, 1).data;
+    return {r: pixel[0], g: pixel[1], b: pixel[2], a: pixel[3]};
+}
+
+el.previewCanvas.addEventListener('click', async (e) => {
+    const rect = el.previewCanvas.getBoundingClientRect();
+    const scaleX = el.previewCanvas.width / rect.width;
+    const scaleY = el.previewCanvas.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    
+    if (state.bgRemovalMethod === 'chromakey' && state.isPickingColor) {
+        const col = await getRawPreviewPixel(x, y);
+        if(col.a > 0) {
+            state.chromaKeyColor = col;
+            const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
+            el.chromaKeyColor.value = hex;
+            
+            state.isPickingColor = false;
+            el.btnPickChromaColor.style.background = "";
+            el.btnPickChromaColor.innerText = "プレビューから色をスポイト";
+            document.getElementById('previewInstruction').innerText = "";
+            triggerPreviewUpdate();
+        }
+    }
+});
+
+el.useBorder.addEventListener('change', () => { el.borderSettings.classList.toggle('hidden', !el.useBorder.checked); triggerPreviewUpdate(); });
+bindControl(document.getElementById('btnBorderDec'), el.borderSlider, document.getElementById('btnBorderInc'), 
+    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+);
+
+function createExactApngDelays(durationSec, frameCount) {
+    const totalMs = Math.max(1, Math.round(durationSec * 1000));
+    const count = Math.max(1, frameCount);
+    const delays = [];
+    for (let i = 0; i < count; i++) {
+        const a = Math.round((i * totalMs) / count);
+        const b = Math.round(((i + 1) * totalMs) / count);
+        delays.push(Math.max(1, b - a));
+    }
+    return delays;
+}
+
+// --- メイン書き出し処理 ---
+el.btnExport.addEventListener('click', async () => {
+    // 既存のURLがあれば解放
+    if (state.processedData && state.processedData.firstFrameBlobUrl) {
+        URL.revokeObjectURL(state.processedData.firstFrameBlobUrl);
+    }
+    // 【追加】最後のコマのURLも解放
+    if (state.processedData && state.processedData.lastFrameBlobUrl) {
+        URL.revokeObjectURL(state.processedData.lastFrameBlobUrl);
+    }
+
+    el.btnExport.disabled = true; el.progressBar.style.display = 'block';
+    const totalExpectedFrames = state.outputFrames.length;
+    const framesArrayBufferList = []; const framesBlobList = [];
+
+    el.progressText.innerText = "画像を出力中 (処理によっては少し時間がかかります)...";
+    for (let i = 0; i < totalExpectedFrames; i++) {
+        el.progressFill.style.width = `${(i / totalExpectedFrames) * 50}%`;
+        let pCanvas = state.cachedFrames[i];
+        if (!pCanvas) {
+            const offsetSec = Math.max(0, Math.min(state.outputFrames[i], getSourceDuration()));
+            pCanvas = await getProcessedCanvasForOutputOffset(offsetSec);
+        }
+
+        // 【追加】書き出し時にも白フチ処理を適用
+        let exportCanvas = pCanvas;
+        if (el.useBorder.checked && state.borderSize > 0) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = pCanvas.width;
+            tempCanvas.height = pCanvas.height;
+            tempCanvas.getContext('2d').drawImage(pCanvas, 0, 0);
+            exportCanvas = applyBorder(tempCanvas, state.borderSize);
+        }
+
+        const imgData = exportCanvas.getContext('2d').getImageData(0, 0, state.targetW, state.targetH);
+        framesArrayBufferList.push(imgData.data.buffer);
+        const blob = await new Promise(r => exportCanvas.toBlob(r, "image/png"));
+        framesBlobList.push(blob);
+    }
+
+    // 修正箇所4: 実データ(framesArrayBufferList等)は表示されている順番で生成されるため、
+    // ここで再度reverse処理を行うと意図しない順序になってしまうため削除しました。
+
+    el.progressText.innerText = "容量を計算し、最適化中...";
+    el.progressFill.style.width = "70%";
+    await new Promise(r => setTimeout(r, 50));
+
+    const colorStrategies = document.getElementById('useCompression').checked ? [0, 256, 220, 180, 150, 120, 90, 70, 50, 30, 16] : [0];
+    const delays = createExactApngDelays(state.apngDuration, framesArrayBufferList.length);
+
+    let finalApngBuffer = null; let finalSizeKb = 0; let appliedComp = "";
+    let originalSizeKb = 0; 
+    let appliedCnum = 0;
+
+    for (const cnum of colorStrategies) {
+        el.progressText.innerText = `APNGエンコード中... (色数設定: ${cnum===0 ? "ロスレス" : cnum})`;
+        await new Promise(r => setTimeout(r, 10));
+        let apngBuf = UPNG.encode(framesArrayBufferList, state.targetW, state.targetH, cnum, delays);
+        
+        // ダウンロード用のデータにはユーザーが設定したループ回数を適用する
+        apngBuf = setApngLoopCount(apngBuf, state.apngLoopCount);
+        
+        const currentSizeKb = apngBuf.byteLength / 1024;
+
+        if (cnum === 0) {
+            originalSizeKb = currentSizeKb; 
+        }
+
+        finalSizeKb = currentSizeKb;
+        finalApngBuffer = apngBuf;
+	appliedCnum = cnum;
+
+        if (finalSizeKb <= state.maxSizeKb) {
+            appliedComp = cnum === 0 ? "圧縮なし(フルカラー)" : `減色最適化 (${cnum}色)`;
+            break;
+        } else {
+            appliedComp = cnum === 0 ? "圧縮なし(フルカラー) ※上限超過" : `減色最適化 (${cnum}色) ※上限を超過したため再圧縮`;
+        }
+    }
+
+    el.progressFill.style.width = "90%";
+    el.progressText.innerText = "プレビュー生成中...";
+    await new Promise(r => setTimeout(r, 10));
+
+    let previewApngBuf = finalApngBuffer.slice(0); 
+    // 【変更】サイト上のプレビュー用にも設定したループ回数を適用
+    previewApngBuf = setApngLoopCount(previewApngBuf, state.apngLoopCount);
+    
+    const previewBlob = new Blob([previewApngBuf], {type: "image/png"});
+    
+    // 1コマ目の画像を静止画として取得 (再生終了時に1コマ目に戻す用)
+    let firstCanvas = state.cachedFrames[0];
+    if (!firstCanvas) {
+        const offsetSec = Math.max(0, Math.min(state.outputFrames[0], getSourceDuration()));
+        firstCanvas = await getProcessedCanvasForOutputOffset(offsetSec);
+    }
+    const firstFrameBuffer = UPNG.encode([framesArrayBufferList[0]], state.targetW, state.targetH, appliedCnum, [0]);
+    const firstFrameBlob = new Blob([firstFrameBuffer], {type: "image/png"});
+
+    // 最後のコマの画像を静止画として取得 (再生終了時に維持する用)
+    let lastCanvas = state.cachedFrames[state.outputFrames.length - 1];
+    if (!lastCanvas) {
+        const offsetSec = Math.max(0, Math.min(state.outputFrames[state.outputFrames.length - 1], getSourceDuration()));
+        lastCanvas = await getProcessedCanvasForOutputOffset(offsetSec);
+    }
+    const lastFrameBuffer = UPNG.encode([framesArrayBufferList[framesArrayBufferList.length - 1]], state.targetW, state.targetH, appliedCnum, [0]);
+    const lastFrameBlob = new Blob([lastFrameBuffer], {type: "image/png"});
+
+    state.processedData = {
+        apngBuffer: finalApngBuffer, framesBlobs: framesBlobList,
+        finalSizeKb: finalSizeKb, originalSizeKb: originalSizeKb, appliedComp: appliedComp,
+        frameCount: framesArrayBufferList.length, duration: state.apngDuration, fps: framesArrayBufferList.length / state.apngDuration,
+        previewBlob: previewBlob,
+        firstFrameBlobUrl: URL.createObjectURL(firstFrameBlob),
+        lastFrameBlobUrl: URL.createObjectURL(lastFrameBlob)
+    };
+    
+    const preloadImgFirst = new Image();
+    preloadImgFirst.src = state.processedData.firstFrameBlobUrl;
+    const preloadImgLast = new Image();
+    preloadImgLast.src = state.processedData.lastFrameBlobUrl;    
+
+    el.progressFill.style.width = '100%'; el.progressText.innerText = "完了！";
+    setTimeout(() => {
+        el.progressBar.style.display = 'none'; el.btnExport.disabled = false;
+        el.resultArea.style.display = 'block'; el.resultArea.scrollIntoView({behavior: "smooth"});
+        const actualDuration = state.apngDuration.toFixed(2);
+        const actualAverageMs = (state.apngDuration * 1000 / framesArrayBufferList.length).toFixed(1);
+
+        let sizeText = "";
+        if (originalSizeKb > 0 && Math.abs(originalSizeKb - finalSizeKb) > 0.1) {
+            const reductionPercent = (((originalSizeKb - finalSizeKb) / originalSizeKb) * 100).toFixed(1);
+            sizeText = `ファイルサイズ: <strong>${finalSizeKb.toFixed(1)} KB</strong> <span style="font-size:0.9em; opacity:0.9;">(元サイズ: ${originalSizeKb.toFixed(1)} KB ／ ${reductionPercent}% 削減)</span>`;
+        } else {
+            sizeText = `ファイルサイズ: <strong>${finalSizeKb.toFixed(1)} KB</strong>`;
+        }
+
+        if (finalSizeKb > state.maxSizeKb) {
+            el.resultStatus.innerHTML = `<div class="warning-box">⚠️ 限界まで圧縮しましたが、制限サイズ(${state.maxSizeKb}KB)を超過しました（現在: ${finalSizeKb.toFixed(1)}KB / 元サイズ: ${originalSizeKb.toFixed(1)}KB）。APNGの秒数を短くするか、コマ数を減らして再試行してください。</div>`;
+        } else {
+            el.resultStatus.innerHTML = `<div class="info-box" style="background:#d4edda; color:#155724; border-left-color:#28a745;">🎉 大成功！制限サイズをクリアしました！<br>【結果】 ${framesArrayBufferList.length}コマ ／ 実再生時間: <strong>${actualDuration}秒</strong> ／ 1コマ平均 <strong>${actualAverageMs}ms</strong><br>${sizeText} ／ 適用された処理: <strong>${appliedComp}</strong></div>`;
+        }
+        
+        // 処理完了時にプレビューを自動再生
+        playFinalPreview();
+
+    }, 500);
+});
+
+// --- 【追加】プレビュー再生処理 ---
+function playFinalPreview() {
+    if (!state.processedData || !state.processedData.previewBlob) return;
+    
+    // 実行中のタイマーをリセット
+    if (state.previewReplayTimer) {
+        clearTimeout(state.previewReplayTimer);
+    }
+    // 古いプレビュー用URLを破棄
+    if (state.currentPreviewUrl) {
+        URL.revokeObjectURL(state.currentPreviewUrl);
+    }
+    
+    // APNGを新しく読み込ませることで強制的に最初から再生させる
+    state.currentPreviewUrl = URL.createObjectURL(state.processedData.previewBlob);
+    el.finalPreviewImg.src = state.currentPreviewUrl;
+    
+    // 設定したAPNGの総再生時間（秒数 × ループ回数 ＋ 100msの余裕）が経過したら、指定の静止画に差し替える
+    state.previewReplayTimer = setTimeout(() => {
+        const endAction = document.querySelector('input[name="previewEndAction"]:checked').value;
+        if (endAction === 'last') {
+            el.finalPreviewImg.src = state.processedData.lastFrameBlobUrl;
+        } else {
+            el.finalPreviewImg.src = state.processedData.firstFrameBlobUrl;
+        }
+    }, (state.processedData.duration * 1000 * state.apngLoopCount) + 100);
+}
+
+// プレビューの再生ボタンのイベント
+el.btnReplayPreview.addEventListener('click', () => {
+    playFinalPreview();
+});
+
+// --- 【追加】最終結果プレビュー再生終了後の挙動変更 ---
+document.querySelectorAll('input[name="previewEndAction"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        // 再生が既に終了しており、静止画に切り替わっている場合は即座に画像を差し替える
+        if (state.processedData && el.finalPreviewImg.src !== state.currentPreviewUrl) {
+            if (e.target.value === 'last') {
+                el.finalPreviewImg.src = state.processedData.lastFrameBlobUrl;
+            } else {
+                el.finalPreviewImg.src = state.processedData.firstFrameBlobUrl;
+            }
+        }
+    });
+});
+
+// --- 最終結果プレビュー背景変更 ---
+document.querySelectorAll('input[name="bgChoice"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const val = e.target.value; const box = el.finalPreviewBox;
+        if(val === "black") box.style.background = "#0d0015";
+        else if(val === "gray") box.style.background = "#aaaaaa";
+        else if(val === "blue") box.style.background = "#749cbd";
+        else box.style.background = "transparent";
+    });
+});
+
+// --- ダウンロード処理 ---
+async function executeDownload(includeApng, includePng, targetButton) {
+    if (!state.processedData) {
+        alert("画像データがありません。先に動画を書き出してください。");
+        return;
+    }
+
+    let baseName = el.filenameInput.value.trim() || "01";
+    if (baseName.endsWith('.zip')) baseName = baseName.slice(0, -4);
+    if (baseName.endsWith('.png')) baseName = baseName.slice(0, -4);
+    
+    const btnOrigText = targetButton.innerText;
+    targetButton.disabled = true;
+
+    try {
+        if (includeApng && !includePng) {
+            targetButton.innerText = "ダウンロード中..."; 
+            
+            const blob = new Blob([state.processedData.apngBuffer], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${baseName}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+        } else {
+            targetButton.innerText = "ZIP生成中..."; 
+            
+            const zip = new JSZip();
+            const now = new Date();
+            const hhmmss = String(now.getHours()).padStart(2, '0') + 
+                           String(now.getMinutes()).padStart(2, '0') + 
+                           String(now.getSeconds()).padStart(2, '0');
+            
+            if (includeApng) {
+                zip.file(`${baseName}.png`, state.processedData.apngBuffer);
+            }
+            
+            if (includePng) {
+                state.processedData.framesBlobs.forEach((blob, idx) => { 
+                    zip.file(`${hhmmss}_${String(idx+1).padStart(2, '0')}_frame_.png`, blob); 
+                });
+            }
+            
+            const content = await zip.generateAsync({type: "blob"});
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `${baseName}.zip`;
+            document.body.appendChild(a); 
+            a.click(); 
+            document.body.removeChild(a); 
+            URL.revokeObjectURL(url);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("ダウンロード中にエラーが発生しました。");
+    } finally {
+        targetButton.innerText = btnOrigText; 
+        targetButton.disabled = false;
+    }
+}
+
+el.btnDownloadApngOnly.addEventListener('click', () => {
+    executeDownload(true, false, el.btnDownloadApngOnly);
+});
+
+el.btnDownloadPngOnly.addEventListener('click', () => {
+    executeDownload(false, true, el.btnDownloadPngOnly);
+});
+
+el.btnDownloadBoth.addEventListener('click', () => {
+    executeDownload(true, true, el.btnDownloadBoth);
+});
+
+// --- トリミング枠のキーボード微調整 ---
+document.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (!state.cropper) return;
+
+    let dx = 0, dy = 0;
+    const step = 1;
+
+    if (e.key === 'ArrowUp' || e.key === 'Up') dy = -step;
+    else if (e.key === 'ArrowDown' || e.key === 'Down') dy = step;
+    else if (e.key === 'ArrowLeft' || e.key === 'Left') dx = -step;
+    else if (e.key === 'ArrowRight' || e.key === 'Right') dx = step;
+    else return;
+
+    e.preventDefault();
+
+    const data = state.cropper.getData(true);
+    state.cropper.setData({ x: data.x + dx, y: data.y + dy });
+    
+    const newData = state.cropper.getData(true);
+    state.cropData = { left: newData.x, top: newData.y, width: newData.width, height: newData.height };
+
+    if (cropUpdateTimer) clearTimeout(cropUpdateTimer);
+    cropUpdateTimer = setTimeout(() => { triggerPreviewUpdate(); }, 500); 
+});
+
+// --- ズーム機能の仕組み ---
+// プレビューのズームを計算して画面に反映する関数です
+function applyPreviewZoom() {
+    if (!el.previewZoomSlider) return;
+    
+    // スライダーの数値（%）を取得
+    const zoomPercent = parseInt(el.previewZoomSlider.value, 10);
+    
+    if (state.targetW && state.targetH) {
+        // キャンバスの「見た目のサイズ（CSS幅）」をパーセントに応じて拡大・縮小します
+        el.previewCanvas.style.width = `${state.targetW * (zoomPercent / 100)}px`;
+        el.previewCanvas.style.height = `${state.targetH * (zoomPercent / 100)}px`;
+        el.previewCanvas.style.maxWidth = 'none'; // CSSの制限を解除して大きくできるようにする
+    }
+    
+    // 拡大にあわせて、消しゴムの丸いカーソルの大きさも正しく表示し直します
+    updateEraserCursor();
+}
+
+// スライダーを動かしたときに上の関数を呼び出します
+if (el.previewZoomSlider) {
+    el.previewZoomSlider.addEventListener('input', (e) => {
+        if (el.previewZoomDisp) el.previewZoomDisp.innerText = e.target.value;
+        applyPreviewZoom();
+    });
+}
+</script>
+</body>
+</html>
