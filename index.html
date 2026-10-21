@@ -178,7 +178,7 @@
 <div class="loading-overlay" id="loadingOverlay">画像を処理中...</div>
 
 <div class="container">
-    <h1>🎨 LINEスタンプ制作 Pro (Ultimate 20)</h1>
+    <h1>🎨 MP4 to APNG ジェネレーター</h1>
     <p class="subtitle">動画から切り取る素材を決めたあと、トリミングした素材からAPNGの秒数とコマ数を設定できます。コマは削除・複製でき、プレビューを見ながら調整できます。</p>
 
     <div class="upload-area" id="uploadArea">
@@ -216,10 +216,10 @@
                 </div>
             </div>
             <div class="col">
-                <label>切り取るコマ数 <span id="sourceFrameCountValDisp">15</span></label>
+                <label>切り取るコマ数 <span id="sourceFrameCountValDisp">20</span></label>
                 <div class="control-group">
                     <button id="btnSourceFrameCountDec">－</button>
-                    <input type="range" id="sourceFrameCountSlider" min="5" max="20" step="1" value="15">
+                    <input type="range" id="sourceFrameCountSlider" min="5" max="20" step="1" value="20">
                     <button id="btnSourceFrameCountInc">＋</button>
                 </div>
             </div>
@@ -235,9 +235,11 @@
         <div style="margin-bottom: 15px;">
             <label>作成する種類を選択してください</label>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
-		<label class="checkbox-label"><input type="radio" name="outputType" value="anim320" checked> アニメーションスタンプ (320 × 270)</label> 
-                <label class="checkbox-label"><input type="radio" name="outputType" value="pop320"> ポップアップ・エフェクトスタンプ (480 × 480)</label>                               
-                <label class="checkbox-label"><input type="radio" name="outputType" value="emoji180"> アニメーション絵文字 (180 × 180)</label>                
+                
+                <label class="checkbox-label"><input type="radio" name="outputType" value="anim320" checked> アニメーションスタンプ (320 × 270)</label>                
+                <label class="checkbox-label"><input type="radio" name="outputType" value="emoji180"> アニメーション絵文字 (180 × 180)</label>
+		<label class="checkbox-label"><input type="radio" name="outputType" value="pop320"> ポップアップスタンプ (480 × 480)</label>
+                
                 <label class="checkbox-label"><input type="radio" name="outputType" value="custom"> 🛠 自由なサイズ（カスタム）</label>
                 <div id="customSizeInputs" class="hidden" style="margin-left: 25px; display: flex; gap: 15px; align-items: center;">
                     <label style="margin: 0;">幅 (W): <input type="number" id="customWidth" value="300" style="width: 80px; padding: 4px;"></label>
@@ -523,9 +525,9 @@ const state = {
     videoDuration: 0,
     startTime: 0.0,
     endTime: 4.0,
-    sourceFrameCount: 15, 
+    sourceFrameCount: 20, 
     apngDuration: 3, 
-    apngFrameCount: 15,
+    apngFrameCount: 20,
     apngLoopCount: 1,
     outputFrames: [], 
     cachedFrames: [], 
@@ -534,8 +536,8 @@ const state = {
     previewToken: 0,
     renderToken: 0, 
     previewPlaying: true,    
-    targetW: 320,
-    targetH: 270,
+    targetW: 480,
+    targetH: 480,
     maxSizeKb: 1000,
     outputTypeStr: "アニメーションスタンプ",
     
@@ -2276,7 +2278,7 @@ document.querySelectorAll('input[name="outputType"]').forEach(radio => {
             state.outputTypeStr = `カスタムサイズ (${state.targetW}x${state.targetH})`;
         } else {
             customSizeInputs.classList.add('hidden');
-            if(val === "pop320"){ state.targetW = 480; state.targetH = 480; state.maxSizeKb = 1000; state.outputTypeStr = "ポップアップ・エフェクトスタンプ (480 × 480)"; }
+            if(val === "pop320"){ state.targetW = 480; state.targetH = 480; state.maxSizeKb = 1000; state.outputTypeStr = "ポップアップスタンプ (320x480)"; }
             else if(val === "anim320"){ state.targetW = 320; state.targetH = 270; state.maxSizeKb = 1000; state.outputTypeStr = "アニメーションスタンプ (320x270)"; }
             else { state.targetW = 180; state.targetH = 180; state.maxSizeKb = 300; state.outputTypeStr = "アニメーション絵文字 (180x180)"; }
         }
@@ -2772,6 +2774,15 @@ if (el.previewZoomSlider) {
         applyPreviewZoom();
     });
 }
+// --- スライダー操作中にHomeキーを押した時の処理 ---
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+    slider.addEventListener('keydown', (e) => {
+        if (e.key === 'Home') {
+            e.preventDefault(); // スライダーが最小値に戻るのを防ぐ
+            window.scrollTo(0, 0); // 強制的にページの一番上にスクロールさせる
+        }
+    });
+});
 </script>
 </body>
 </html>
