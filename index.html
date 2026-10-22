@@ -2662,16 +2662,33 @@ async function executeDownload(includeApng, includePng, targetButton) {
             targetButton.innerText = "ダウンロード中..."; 
             
             const blob = new Blob([state.processedData.apngBuffer], { type: 'image/png' });
-            const url = URL.createObjectURL(blob);
             
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${baseName}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
+            // ▼追加・修正部分：APNG（1枚の画像）の保存処理
+            const filename = `${baseName}.png`;
+            const file = new File([blob], filename, { type: 'image/png' });
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: baseName
+                    });
+                } catch (err) {
+                    console.log('共有がキャンセルされました:', err);
+                }
+            } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            // ▲追加・修正部分ここまで
+
         } else {
             targetButton.innerText = "ZIP生成中..."; 
             
@@ -2692,14 +2709,32 @@ async function executeDownload(includeApng, includePng, targetButton) {
             }
             
             const content = await zip.generateAsync({type: "blob"});
-            const url = URL.createObjectURL(content);
-            const a = document.createElement('a'); 
-            a.href = url; 
-            a.download = `${baseName}.zip`;
-            document.body.appendChild(a); 
-            a.click(); 
-            document.body.removeChild(a); 
-            URL.revokeObjectURL(url);
+            
+            // ▼追加・修正部分：ZIP（複数ファイル）の保存処理
+            const filename = `${baseName}.zip`;
+            const file = new File([content], filename, { type: 'application/zip' });
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: baseName
+                    });
+                } catch (err) {
+                    console.log('共有がキャンセルされました:', err);
+                }
+            } else {
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a'); 
+                a.href = url; 
+                a.download = filename;
+                document.body.appendChild(a); 
+                a.click(); 
+                document.body.removeChild(a); 
+                URL.revokeObjectURL(url);
+            }
+            // ▲追加・修正部分ここまで
         }
     } catch (e) {
         console.error(e);
@@ -2709,7 +2744,6 @@ async function executeDownload(includeApng, includePng, targetButton) {
         targetButton.disabled = false;
     }
 }
-
 el.btnDownloadApngOnly.addEventListener('click', () => {
     executeDownload(true, false, el.btnDownloadApngOnly);
 });
