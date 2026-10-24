@@ -2704,7 +2704,7 @@ async function executeDownload(includeApng, includePng, targetButton) {
             
             if (includePng) {
                 state.processedData.framesBlobs.forEach((blob, idx) => { 
-                    zip.file(`${hhmmss}_${String(idx+1).padStart(2, '0')}_frame_.png`, blob); 
+                    zip.file(`${hhmmss}_${String(idx+1).padStart(2, '0')}_frame.png`, blob); 
                 });
             }
             
