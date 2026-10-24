@@ -219,7 +219,7 @@
                 <label>切り取るコマ数 <span id="sourceFrameCountValDisp">20</span></label>
                 <div class="control-group">
                     <button id="btnSourceFrameCountDec">－</button>
-                    <input type="range" id="sourceFrameCountSlider" min="5" max="20" step="1" value="20">
+                    <input type="range" id="sourceFrameCountSlider" min="5" max="30" step="1" value="20">
                     <button id="btnSourceFrameCountInc">＋</button>
                 </div>
             </div>
@@ -2744,6 +2744,7 @@ async function executeDownload(includeApng, includePng, targetButton) {
         targetButton.disabled = false;
     }
 }
+
 el.btnDownloadApngOnly.addEventListener('click', () => {
     executeDownload(true, false, el.btnDownloadApngOnly);
 });
