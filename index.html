@@ -242,8 +242,8 @@
                 
                 <label class="checkbox-label"><input type="radio" name="outputType" value="custom"> 🛠 自由なサイズ（カスタム）</label>
                 <div id="customSizeInputs" class="hidden" style="margin-left: 25px; display: flex; gap: 15px; align-items: center;">
-                    <label style="margin: 0;">幅 (W): <input type="number" id="customWidth" value="300" style="width: 80px; padding: 4px;"></label>
-                    <label style="margin: 0;">高さ (H): <input type="number" id="customHeight" value="300" style="width: 80px; padding: 4px;"></label>
+                    <label style="margin: 0;">幅 (W): <input type="number" id="customWidth" value="240" style="width: 80px; padding: 4px;"></label>
+                    <label style="margin: 0;">高さ (H): <input type="number" id="customHeight" value="240" style="width: 80px; padding: 4px;"></label>
                 </div>
             </div>
         </div>
@@ -328,7 +328,9 @@
                     </div>
                 </div>
                 <div class="col">
-                    <label>クロマキー許容値 (%) <span id="chromaTolValDisp">10</span></label>
+                    <label>クロマキー許容値 (%) 
+    <input type="number" id="chromaTolInput" min="0" max="100" value="10" style="width: 60px; padding: 2px 5px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-left: 5px;">
+</label>
                     <div class="control-group">
                         <button id="btnChromaTolDec">－</button>
                         <input type="range" id="chromaTolSlider" min="0" max="100" step="1" value="10">
@@ -536,8 +538,8 @@ const state = {
     previewToken: 0,
     renderToken: 0, 
     previewPlaying: true,    
-    targetW: 480,
-    targetH: 480,
+    targetW: 320,
+    targetH: 270,
     maxSizeKb: 1000,
     outputTypeStr: "アニメーションスタンプ",
     
@@ -613,8 +615,9 @@ const el = {
     
     chromakeySettings: document.getElementById('chromakeySettings'),
     
-    chromaKeyColor: document.getElementById('chromaKeyColor'),
+    chromaTolColor: document.getElementById('chromaKeyColor'),
     chromaTolSlider: document.getElementById('chromaTolSlider'),
+    chromaTolInput: document.getElementById('chromaTolInput'),
     shrinkTolSlider: document.getElementById('shrinkTolSlider'),
     despillSlider: document.getElementById('despillSlider'),
     despillRangeSlider: document.getElementById('despillRangeSlider'),
@@ -1605,7 +1608,7 @@ function updateDisplays(renderFrames = true) {
     el.sourceFrameCountValDisp.innerText = el.sourceFrameCountSlider.value;
     document.getElementById('borderValDisp').innerText = el.borderSlider.value;
     
-    document.getElementById('chromaTolValDisp').innerText = el.chromaTolSlider.value;
+    el.chromaTolInput.value = el.chromaTolSlider.value;
     document.getElementById('shrinkTolValDisp').innerText = el.shrinkTolSlider.value;
     document.getElementById('despillValDisp').innerText = el.despillSlider.value;
     document.getElementById('despillRangeValDisp').innerText = el.despillRangeSlider.value;
@@ -2272,8 +2275,8 @@ document.querySelectorAll('input[name="outputType"]').forEach(radio => {
         
         if (val === "custom") {
             customSizeInputs.classList.remove('hidden');
-            state.targetW = parseInt(customWidth.value) || 300;
-            state.targetH = parseInt(customHeight.value) || 300;
+            state.targetW = parseInt(customWidth.value) || 240;
+            state.targetH = parseInt(customHeight.value) || 240;
             state.maxSizeKb = 1000;
             state.outputTypeStr = `カスタムサイズ (${state.targetW}x${state.targetH})`;
         } else {
@@ -2295,8 +2298,8 @@ document.querySelectorAll('input[name="outputType"]').forEach(radio => {
 function updateCustomSize() {
     const radioCustom = document.querySelector('input[name="outputType"][value="custom"]');
     if (radioCustom && radioCustom.checked) {
-        state.targetW = parseInt(customWidth.value) || 300;
-        state.targetH = parseInt(customHeight.value) || 300;
+        state.targetW = parseInt(customWidth.value) || 240;
+        state.targetH = parseInt(customHeight.value) || 240;
         state.outputTypeStr = `カスタムサイズ (${state.targetW}x${state.targetH})`;
         
         if (state.cropper) {
@@ -2324,13 +2327,58 @@ document.querySelectorAll('input[name="bgRemovalMethod"]').forEach(radio => {
     });
 });
 
-el.chromaKeyColor.addEventListener('input', (e) => {
+el.chromaTolColor.addEventListener('input', (e) => {
     state.chromaKeyColor = hexToRgb(e.target.value);
     triggerPreviewUpdate();
 });
-bindControl(document.getElementById('btnChromaTolDec'), el.chromaTolSlider, document.getElementById('btnChromaTolInc'), 
-    () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
+
+
+// --- クロマキー許容値のUI連動 ---
+
+// 1. スライダーを動かした時 ＆ プラス・マイナスボタンを押した時の連動
+bindControl(
+    document.getElementById('btnChromaTolDec'), 
+    el.chromaTolSlider, 
+    document.getElementById('btnChromaTolInc'), 
+    () => { 
+        el.chromaTolInput.value = el.chromaTolSlider.value; // スライダーの数値を入力欄へ
+        updateDisplays(false); 
+    }, 
+    () => { triggerPreviewUpdate(); }
 );
+
+// 2. 数値入力欄の値をスライダーとプレビューに反映させる共通処理
+function applyChromaTolInput() {
+    let val = parseInt(el.chromaTolInput.value, 10);
+    
+    // 空っぽや範囲外（0〜100以外）の値が入った場合の安全対策
+    if (isNaN(val)) val = 10;
+    if (val < 0) val = 0;
+    if (val > 100) val = 100;
+    
+    // スライダーと入力ボックスの数字を一致させる
+    el.chromaTolSlider.value = val;
+    el.chromaTolInput.value = val;
+    
+    // アプリに設定を反映させてプレビューを更新
+    updateDisplays(false);
+    triggerPreviewUpdate();
+}
+
+// 3. 入力欄で「エンターキー」を押した時に反映
+el.chromaTolInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // 画面がリロードされるのを防ぐ
+        applyChromaTolInput();
+    }
+});
+
+// 4. 入力欄からフォーカスが外れた時（別の場所をクリックした時）にも反映
+el.chromaTolInput.addEventListener('change', () => {
+    applyChromaTolInput();
+});
+
+
 bindControl(document.getElementById('btnShrinkTolDec'), el.shrinkTolSlider, document.getElementById('btnShrinkTolInc'),
     () => { updateDisplays(false); }, () => { triggerPreviewUpdate(); }
 );
