@@ -2370,9 +2370,9 @@ el.chromaTolInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault(); // 画面がリロードされるのを防ぐ
         applyChromaTolInput();
+        el.chromaTolInput.blur(); // ← この1行を追加してフォーカスを外す
     }
 });
-
 // 4. 入力欄からフォーカスが外れた時（別の場所をクリックした時）にも反映
 el.chromaTolInput.addEventListener('change', () => {
     applyChromaTolInput();
