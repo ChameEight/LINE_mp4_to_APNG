@@ -403,9 +403,10 @@
 
         <div id="eraserToolbar" style="margin-top: 10px; margin-bottom: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 6px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
-                <button id="btnToggleEraser" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-weight: bold;">
-                    ✏️ 手描き編集: OFF
-                </button>
+                <button id="btnToggleEraser" style="padding: 8px 12px; border: 2px solid var(--primary-color); border-radius: 4px; background: #fff; color: var(--primary-color); cursor: pointer; font-weight: bold; transition: all 0.2s;">
+    ✏️ 手描き編集をONにする
+</button>
+<span style="font-size: 0.85rem; color: #666; margin-left: 10px;">←消しゴムや塗りつぶしを使う場合はクリック</span>
                 
                 <!-- Undo / Redo ボタンを追加 -->
                 <div style="display: flex; align-items: center; gap: 5px; border-right: 1px dashed #ccc; padding-right: 15px;">
@@ -811,9 +812,11 @@ btnToggleEraser.addEventListener('click', async () => {
     const drawToolRadios = document.getElementsByName('drawTool');
     
     if (eraserState.isActive) {
-        btnToggleEraser.style.background = "#ffe8e8";
-        btnToggleEraser.style.borderColor = "#ffaaaa";
-        btnToggleEraser.innerText = "✏️ 手描き編集: ON";
+        // ONになった時のデザインと文言
+        btnToggleEraser.style.background = "var(--primary-color)";
+        btnToggleEraser.style.borderColor = "var(--primary-color)";
+        btnToggleEraser.style.color = "#fff";
+        btnToggleEraser.innerText = "✏️ 手描き編集を終了する (OFF)";
         
         drawToolRadios.forEach(r => r.disabled = false);
         const isFill = eraserState.tool === 'fill';
@@ -823,9 +826,11 @@ btnToggleEraser.addEventListener('click', async () => {
         updateEraserCursor();
         await switchEraserFrame(state.eraserFrameIdx || 0); // ここを変更
     } else {
+        // OFFになった時（初期状態）のデザインと文言に戻す
         btnToggleEraser.style.background = "#fff";
-        btnToggleEraser.style.borderColor = "#ccc";
-        btnToggleEraser.innerText = "✏️ 手描き編集: OFF";
+        btnToggleEraser.style.borderColor = "var(--primary-color)";
+        btnToggleEraser.style.color = "var(--primary-color)";
+        btnToggleEraser.innerText = "✏️ 手描き編集をONにする";
         el.previewCanvas.style.cursor = "default";
         
         drawToolRadios.forEach(r => r.disabled = true);
@@ -2021,7 +2026,7 @@ el.hiddenVideo.addEventListener('loadeddata', async () => {
     const initialBgColor = await autoDetectBackgroundColor();
     state.chromaKeyColor = initialBgColor;
     const initialHex = "#" + (1 << 24 | initialBgColor.r << 16 | initialBgColor.g << 8 | initialBgColor.b).toString(16).slice(1);
-    if (el.chromaKeyColor) el.chromaKeyColor.value = initialHex;
+    if (el.chromaTolColor) el.chromaTolColor.value = initialHex;
     
     el.loadingOverlay.style.display = 'flex';
     await renderFrameStrip();
@@ -2398,6 +2403,11 @@ el.btnPickChromaColor.addEventListener('click', () => {
         el.btnPickChromaColor.style.background = "#ffb3b3";
         el.btnPickChromaColor.innerText = "キャンセル (プレビュー画像をクリック)";
         document.getElementById('previewInstruction').innerText = "（クリックで色を取得します）";
+
+	if (eraserState.isActive) {
+            btnToggleEraser.click();
+        }
+        el.previewCanvas.style.cursor = "crosshair";
         
         // クロマキー用スポイトをONにした時、手描き用スポイトを強制OFFにする
         if (eraserState.isPickingColor) {
@@ -2412,6 +2422,8 @@ el.btnPickChromaColor.addEventListener('click', () => {
         el.btnPickChromaColor.style.background = "";
         el.btnPickChromaColor.innerText = "プレビューから色をスポイト";
         document.getElementById('previewInstruction').innerText = "";
+
+	el.previewCanvas.style.cursor = "default";
     }
     // ボタンのON/OFFを切り替えた直後にプレビューを更新する
     triggerPreviewUpdate(); 
@@ -2423,8 +2435,8 @@ el.btnAutoDetectColor.addEventListener('click', async () => {
     const col = await autoDetectBackgroundColor();
     
     state.chromaKeyColor = col;
-    const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
-    el.chromaKeyColor.value = hex;
+const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
+el.chromaTolColor.value = hex;
     
     el.btnAutoDetectColor.innerText = "✨ 自動検出";
     el.btnAutoDetectColor.disabled = false;
@@ -2455,13 +2467,15 @@ el.previewCanvas.addEventListener('click', async (e) => {
         const col = await getRawPreviewPixel(x, y);
         if(col.a > 0) {
             state.chromaKeyColor = col;
-            const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
-            el.chromaKeyColor.value = hex;
+    const hex = "#" + (1 << 24 | col.r << 16 | col.g << 8 | col.b).toString(16).slice(1);
+    el.chromaTolColor.value = hex;
             
             state.isPickingColor = false;
             el.btnPickChromaColor.style.background = "";
             el.btnPickChromaColor.innerText = "プレビューから色をスポイト";
             document.getElementById('previewInstruction').innerText = "";
+
+	    el.previewCanvas.style.cursor = "default";
             triggerPreviewUpdate();
         }
     }
